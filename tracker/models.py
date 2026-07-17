@@ -73,12 +73,18 @@ class Track(models.Model):
             str: One of "Done", "In Route", "30 minutes till take off", or "Scheduled"
         """
         now = timezone.now()
+        arrival_delta = now - self.scheduled_arrival
+        departure_delta = now - self.scheduled_departure
+        thirty_min_delta = timezone.timedelta(minutes=30)
 
-        if now > self.scheduled_arrival:
+        # Done: arrival time has passed (even by a small margin)
+        if arrival_delta >= timezone.timedelta(seconds=0):
             return "Done"
-        elif now > self.scheduled_departure and now <= self.scheduled_arrival:
+        # In Route: departed but not yet arrived
+        elif departure_delta > timezone.timedelta(seconds=0) and arrival_delta < timezone.timedelta(seconds=0):
             return "In Route"
-        elif now >= self.scheduled_departure - timezone.timedelta(minutes=30):
+        # 30 minutes till take off: within 30 min window before departure
+        elif departure_delta < timezone.timedelta(seconds=0) and departure_delta >= -thirty_min_delta:
             return "30 minutes till take off"
         else:
             return "Scheduled"
