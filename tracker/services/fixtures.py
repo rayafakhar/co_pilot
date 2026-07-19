@@ -153,6 +153,13 @@ AIRCRAFT_TYPES = (
         crew_count=6,
         wingspan_m=35.80,
         length_m=37.57,
+        image="tracker/images/aircraft/airbus-a320neo.jpg",
+        image_alt_text="Airbus A320neo on final approach",
+        image_source_url=(
+            "https://commons.wikimedia.org/wiki/File:Frontier_Airbus_A320neo_N353FR_BWI_MD1.jpg"
+        ),
+        image_author="Acroterion",
+        image_license="CC BY-SA 4.0",
     ),
     dict(
         manufacturer="Airbus",
@@ -166,6 +173,13 @@ AIRCRAFT_TYPES = (
         crew_count=7,
         wingspan_m=35.80,
         length_m=44.51,
+        image="tracker/images/aircraft/airbus-a321neo.jpg",
+        image_alt_text="Airbus A321neo on final approach",
+        image_source_url=(
+            "https://commons.wikimedia.org/wiki/File:Frontier_Airbus_A321_N615FR_BWI_MD1.jpg"
+        ),
+        image_author="Acroterion",
+        image_license="CC BY-SA 4.0",
     ),
     dict(
         manufacturer="Airbus",
@@ -179,6 +193,13 @@ AIRCRAFT_TYPES = (
         crew_count=11,
         wingspan_m=60.30,
         length_m=63.66,
+        image="tracker/images/aircraft/airbus-a330-300.jpg",
+        image_alt_text="Airbus A330-300 on final approach",
+        image_source_url=(
+            "https://commons.wikimedia.org/wiki/File:Swiss_Airbus_A330-300_HB-JHM_IAD_VA1.jpg"
+        ),
+        image_author="Acroterion",
+        image_license="CC BY-SA 4.0",
     ),
     dict(
         manufacturer="Airbus",
@@ -192,6 +213,13 @@ AIRCRAFT_TYPES = (
         crew_count=12,
         wingspan_m=64.75,
         length_m=66.80,
+        image="tracker/images/aircraft/airbus-a350-900.jpg",
+        image_alt_text="Airbus A350-900 test-bed demonstrator in flight",
+        image_source_url=(
+            "https://commons.wikimedia.org/wiki/File:Airbus_A350-900_Test-bed-Demonstrator.jpg"
+        ),
+        image_author="K.M.ABU BAKAR SIDDIQUE",
+        image_license="CC BY-SA 4.0",
     ),
     dict(
         manufacturer="Boeing",
@@ -205,6 +233,13 @@ AIRCRAFT_TYPES = (
         crew_count=6,
         wingspan_m=35.92,
         length_m=39.52,
+        image="tracker/images/aircraft/boeing-737-max-8.jpg",
+        image_alt_text="Boeing 737 MAX 8 on final approach",
+        image_source_url=(
+            "https://commons.wikimedia.org/wiki/File:Southwest_Boeing_737-8_MAX_N8847Q_BWI_MD2.jpg"
+        ),
+        image_author="Acroterion",
+        image_license="CC BY-SA 4.0",
     ),
     dict(
         manufacturer="Boeing",
@@ -218,6 +253,13 @@ AIRCRAFT_TYPES = (
         crew_count=14,
         wingspan_m=64.80,
         length_m=73.86,
+        image="tracker/images/aircraft/boeing-777-300er.jpg",
+        image_alt_text="Boeing 777-300ER on final approach",
+        image_source_url=(
+            "https://commons.wikimedia.org/wiki/File:United_Boeing_777-300ER_N2136U_IAD_VA2.jpg"
+        ),
+        image_author="Acroterion",
+        image_license="CC BY-SA 4.0",
     ),
     dict(
         manufacturer="Boeing",
@@ -231,6 +273,13 @@ AIRCRAFT_TYPES = (
         crew_count=11,
         wingspan_m=60.12,
         length_m=62.81,
+        image="tracker/images/aircraft/boeing-787-9.jpg",
+        image_alt_text="Boeing 787-9 on final approach",
+        image_source_url=(
+            "https://commons.wikimedia.org/wiki/File:Etihad_Boeing_787-9_A6-BNI_IAD_VA2.jpg"
+        ),
+        image_author="Acroterion",
+        image_license="CC BY-SA 4.0",
     ),
 )
 

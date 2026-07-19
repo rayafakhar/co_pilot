@@ -12,10 +12,17 @@
             <span>{{ aircraft.registration }}</span>
         </nav>
         <div class="aircraft-hero-grid">
-            <div class="aircraft-portrait">
+            <div class="aircraft-portrait{% if aircraft.aircraft_type.image_source_url %} aircraft-portrait--photo{% endif %}">
                 <div class="bearing-markers" aria-hidden="true"><span>270</span><span>090</span></div>
                 <img src="{% static aircraft.aircraft_type.image %}" alt="{{ aircraft.aircraft_type.image_alt_text }}">
+                {% if aircraft.aircraft_type.image_source_url %}
+                <p class="image-credit">
+                    Photo by {{ aircraft.aircraft_type.image_author }} · {{ aircraft.aircraft_type.image_license }} ·
+                    <a href="{{ aircraft.aircraft_type.image_source_url }}" target="_blank" rel="noopener noreferrer">source</a>
+                </p>
+                {% else %}
                 <p>Repository-local illustration · not to scale</p>
+                {% endif %}
             </div>
             <div class="aircraft-identity">
                 <p class="eyebrow">Fleet asset / {{ aircraft.aircraft_type.icao_type_code }}</p>

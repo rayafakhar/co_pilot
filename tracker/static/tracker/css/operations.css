@@ -220,8 +220,13 @@ h1, h2, h3 { font-family: var(--display); }
 .aircraft-portrait { position: relative; min-height: 275px; display: grid; place-items: center; border: 1px solid var(--line); background: #07111a; overflow: hidden; }
 .aircraft-portrait::before { content: ""; position: absolute; inset: 50% 0 auto; border-top: 1px dashed #294052; }
 .aircraft-portrait img { position: relative; z-index: 1; width: min(90%, 620px); filter: drop-shadow(0 20px 22px rgba(0,0,0,.48)); }
-.aircraft-portrait p { position: absolute; right: 13px; bottom: 9px; margin: 0; color: var(--faint); font: .58rem var(--data); }
-.bearing-markers { position: absolute; inset: 12px; display: flex; justify-content: space-between; color: var(--faint); font: .58rem var(--data); }
+.aircraft-portrait p { position: absolute; z-index: 3; right: 13px; bottom: 9px; max-width: calc(100% - 26px); margin: 0; color: var(--faint); font: .58rem/1.45 var(--data); text-align: right; }
+.aircraft-portrait p a { color: #d8efff; text-decoration: underline; text-underline-offset: 2px; }
+.aircraft-portrait--photo::before { display: none; }
+.aircraft-portrait--photo::after { content: ""; position: absolute; z-index: 1; inset: 48% 0 0; background: linear-gradient(180deg, transparent, rgba(3,10,16,.9)); pointer-events: none; }
+.aircraft-portrait--photo img { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(.82) contrast(1.08); }
+.aircraft-portrait--photo .image-credit { padding: 4px 7px; color: #dce7ee; background: rgba(3,10,16,.72); }
+.bearing-markers { position: absolute; z-index: 2; inset: 12px; display: flex; justify-content: space-between; color: #dce7ee; font: .58rem var(--data); text-shadow: 0 1px 5px #000; }
 .aircraft-identity h1, .detail-hero--flight h1 { margin: 0; font-size: clamp(3.5rem, 6vw, 6.8rem); letter-spacing: -.045em; line-height: .9; }
 .aircraft-model { margin: 16px 0; color: var(--sky); font: 1.2rem var(--display); }
 .identity-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: .78rem; }

@@ -18,7 +18,7 @@ validated before data is committed.
 - One authoritative server-side flight lifecycle with exact boundary tests
 - UTC storage plus explicitly labelled UTC and airport-local display times
 - A filterable, responsive flight board refreshed from JSON every 20 seconds
-- Aircraft pages with current state, utilization, technical data, route history, and a merged timeline
+- Aircraft pages with licensed model-specific photography, current state, technical data, and timelines
 - Flight detail pages comparing scheduled, estimated, and actual timing
 - Structured validation errors, atomic generation, and rollback on violations
 - Bounded/select-related queries, accessible focus states, no-JavaScript fallback, and mobile cards
@@ -211,7 +211,7 @@ tracker/
 │   ├── presentation.py          Shared HTML/JSON row representation
 │   ├── status.py                Single lifecycle authority
 │   └── validation.py            Structured cross-flight invariants
-├── static/tracker/              Local CSS, JavaScript, and original SVG
+├── static/tracker/              Local CSS, JavaScript, aircraft photos, and fallback SVG
 ├── templates/tracker/           Board and detail pages
 └── tests/                       Domain, engine, command, and view coverage
 docs/                            Baseline, assumptions, attribution, screenshots
