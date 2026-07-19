@@ -3,7 +3,7 @@ Views for the tracker app.
 """
 
 from django.shortcuts import render
-from .models import Track
+from .models import Flight
 
 
 def flight_board(request):
@@ -19,8 +19,8 @@ def flight_board(request):
     Returns:
         Rendered template with optimized track queryset
     """
-    tracks = Track.objects.select_related(
-        'airplane',
+    tracks = Flight.objects.select_related(
+        'aircraft',
         'departure_airport',
         'arrival_airport'
     ).order_by('scheduled_departure')

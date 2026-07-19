@@ -1,56 +1,47 @@
-"""
-Admin configuration for tracker app.
-"""
+"""Focused Django admin for simulated aviation operations."""
 
 from django.contrib import admin
-from .models import Airport, Airplane, Track
+
+from .models import Aircraft, AircraftType, Airport, Flight, MaintenanceBlock
 
 
 @admin.register(Airport)
 class AirportAdmin(admin.ModelAdmin):
-    """Admin configuration for Airport model."""
-
-    list_display = ('code', 'name')
-    list_filter = ('code',)
-    search_fields = ('name', 'code')
+    list_display = ("iata_code", "icao_code", "name", "city", "country", "timezone")
+    list_filter = ("country", "timezone")
+    search_fields = ("name", "city", "country", "iata_code", "icao_code")
 
 
-@admin.register(Airplane)
-class AirplaneAdmin(admin.ModelAdmin):
-    """Admin configuration for Airplane model."""
+@admin.register(AircraftType)
+class AircraftTypeAdmin(admin.ModelAdmin):
+    list_display = ("icao_type_code", "manufacturer", "model", "category", "maximum_range_km")
+    list_filter = ("category", "manufacturer")
+    search_fields = ("icao_type_code", "manufacturer", "model")
 
-    list_display = ('tail_number', 'name')
-    search_fields = ('name', 'tail_number')
+
+@admin.register(Aircraft)
+class AircraftAdmin(admin.ModelAdmin):
+    list_display = ("registration", "display_name", "aircraft_type", "operator", "maintenance_status")
+    list_filter = ("active", "maintenance_status", "aircraft_type")
+    search_fields = ("display_name", "registration", "operator")
+    list_select_related = ("aircraft_type", "base_airport", "last_known_airport")
 
 
-@admin.register(Track)
-class TrackAdmin(admin.ModelAdmin):
-    """Admin configuration for Track model with optimized queries."""
+@admin.register(Flight)
+class FlightAdmin(admin.ModelAdmin):
+    list_display = ("flight_number", "aircraft", "route", "scheduled_departure", "status")
+    list_filter = ("status", "flight_type", "aircraft", "scheduled_departure")
+    search_fields = ("flight_number", "aircraft__display_name", "aircraft__registration")
+    list_select_related = ("aircraft", "departure_airport", "arrival_airport")
+    date_hierarchy = "scheduled_departure"
 
-    list_display = (
-        'airplane',
-        'route',
-        'scheduled_departure',
-        'scheduled_arrival',
-        'current_status',
-    )
-    list_filter = ('airplane', 'scheduled_departure')
-    search_fields = ('airplane__name', 'airplane__tail_number')
-    list_select_related = (
-        'airplane',
-        'departure_airport',
-        'arrival_airport',
-    )
-    date_hierarchy = 'scheduled_departure'
-
+    @admin.display(description="Route", ordering="departure_airport__iata_code")
     def route(self, obj):
-        """Display the route as departure → arrival."""
-        return f"{obj.departure_airport.code} → {obj.arrival_airport.code}"
-    route.short_description = 'Route'
-    route.admin_order_field = 'departure_airport__code'
+        return f"{obj.departure_airport.display_code} -> {obj.arrival_airport.display_code}"
 
-    def current_status(self, obj):
-        """Display the current status of the track."""
-        return obj.current_status
-    current_status.short_description = 'Status'
-    current_status.admin_order_field = 'scheduled_departure'
+
+@admin.register(MaintenanceBlock)
+class MaintenanceBlockAdmin(admin.ModelAdmin):
+    list_display = ("aircraft", "starts_at", "ends_at", "reason")
+    list_select_related = ("aircraft",)
+    search_fields = ("aircraft__registration", "reason")
