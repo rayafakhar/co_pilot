@@ -7,7 +7,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import F, Q
 
-from .validators import validate_iata_code, validate_icao_code, validate_iana_timezone
+from .validators import validate_iana_timezone, validate_iata_code, validate_icao_code
 
 
 class Airport(models.Model):
@@ -16,16 +16,37 @@ class Airport(models.Model):
     name = models.CharField(max_length=255)
     city = models.CharField(max_length=120)
     country = models.CharField(max_length=120)
-    iata_code = models.CharField(max_length=3, unique=True, null=True, blank=True, validators=[validate_iata_code])
-    icao_code = models.CharField(max_length=4, unique=True, null=True, blank=True, validators=[validate_icao_code])
+    iata_code = models.CharField(
+        max_length=3, unique=True, null=True, blank=True, validators=[validate_iata_code]
+    )
+    icao_code = models.CharField(
+        max_length=4, unique=True, null=True, blank=True, validators=[validate_icao_code]
+    )
     timezone = models.CharField(max_length=64, default="UTC", validators=[validate_iana_timezone])
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-90), MaxValueValidator(90)])
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, validators=[MinValueValidator(-180), MaxValueValidator(180)])
+    latitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(-90), MaxValueValidator(90)],
+    )
+    longitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(-180), MaxValueValidator(180)],
+    )
     minimum_connection_minutes = models.PositiveSmallIntegerField(default=45)
 
     class Meta:
         ordering = ["iata_code", "name"]
-        constraints = [models.CheckConstraint(condition=Q(minimum_connection_minutes__gt=0), name="airport_connection_minutes_positive")]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(minimum_connection_minutes__gt=0),
+                name="airport_connection_minutes_positive",
+            )
+        ]
 
     @property
     def display_code(self) -> str:
@@ -78,10 +99,19 @@ class AircraftType(models.Model):
     class Meta:
         ordering = ["manufacturer", "model"]
         constraints = [
-            models.CheckConstraint(condition=Q(typical_cruise_speed_kmh__gt=0), name="aircraft_type_speed_positive"),
-            models.CheckConstraint(condition=Q(maximum_range_km__gt=0), name="aircraft_type_range_positive"),
-            models.CheckConstraint(condition=Q(minimum_turnaround_minutes__gt=0), name="aircraft_type_turnaround_positive"),
-            models.CheckConstraint(condition=Q(passenger_capacity__gt=0), name="aircraft_type_capacity_positive"),
+            models.CheckConstraint(
+                condition=Q(typical_cruise_speed_kmh__gt=0), name="aircraft_type_speed_positive"
+            ),
+            models.CheckConstraint(
+                condition=Q(maximum_range_km__gt=0), name="aircraft_type_range_positive"
+            ),
+            models.CheckConstraint(
+                condition=Q(minimum_turnaround_minutes__gt=0),
+                name="aircraft_type_turnaround_positive",
+            ),
+            models.CheckConstraint(
+                condition=Q(passenger_capacity__gt=0), name="aircraft_type_capacity_positive"
+            ),
         ]
 
     def clean(self) -> None:
@@ -105,7 +135,9 @@ class Aircraft(models.Model):
 
     registration = models.CharField(max_length=20, unique=True)
     display_name = models.CharField(max_length=255)
-    aircraft_type = models.ForeignKey(AircraftType, on_delete=models.PROTECT, related_name="aircraft")
+    aircraft_type = models.ForeignKey(
+        AircraftType, on_delete=models.PROTECT, related_name="aircraft"
+    )
     operator = models.CharField(max_length=120, default="Northstar Demo Air")
     base_airport = models.ForeignKey(
         Airport, on_delete=models.SET_NULL, null=True, blank=True, related_name="based_aircraft"
@@ -175,8 +207,12 @@ class Flight(models.Model):
     estimated_arrival = models.DateTimeField(null=True, blank=True)
     actual_departure = models.DateTimeField(null=True, blank=True)
     actual_arrival = models.DateTimeField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED, db_index=True)
-    flight_type = models.CharField(max_length=30, choices=FlightType.choices, default=FlightType.PASSENGER)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.SCHEDULED, db_index=True
+    )
+    flight_type = models.CharField(
+        max_length=30, choices=FlightType.choices, default=FlightType.PASSENGER
+    )
     distance_km = models.PositiveIntegerField(default=0)
     planned_duration_minutes = models.PositiveIntegerField()
     delay_minutes = models.PositiveIntegerField(default=0)
@@ -195,7 +231,9 @@ class Flight(models.Model):
     class Meta:
         ordering = ["scheduled_departure", "flight_number"]
         indexes = [
-            models.Index(fields=["aircraft", "scheduled_departure"], name="flight_aircraft_dep_idx"),
+            models.Index(
+                fields=["aircraft", "scheduled_departure"], name="flight_aircraft_dep_idx"
+            ),
             models.Index(fields=["status", "scheduled_departure"], name="flight_status_dep_idx"),
         ]
         constraints = [
@@ -256,9 +294,13 @@ class Flight(models.Model):
         if self.status == self.Status.CANCELLED and (
             self.actual_departure or self.actual_arrival or self.diversion_airport_id
         ):
-            errors["status"] = "A cancelled flight cannot contain movement timestamps or a diversion."
+            errors["status"] = (
+                "A cancelled flight cannot contain movement timestamps or a diversion."
+            )
         if self.diversion_airport_id in {self.departure_airport_id, self.arrival_airport_id}:
-            errors["diversion_airport"] = "Diversion airport must differ from both planned airports."
+            errors["diversion_airport"] = (
+                "Diversion airport must differ from both planned airports."
+            )
         if self.diversion_airport_id and self.status != self.Status.DIVERTED:
             errors["status"] = "A flight with a diversion airport must use diverted status."
         if errors:
@@ -280,7 +322,9 @@ class Flight(models.Model):
 class MaintenanceBlock(models.Model):
     """A period during which an aircraft cannot operate a flight."""
 
-    aircraft = models.ForeignKey(Aircraft, on_delete=models.CASCADE, related_name="maintenance_blocks")
+    aircraft = models.ForeignKey(
+        Aircraft, on_delete=models.CASCADE, related_name="maintenance_blocks"
+    )
     starts_at = models.DateTimeField()
     ends_at = models.DateTimeField()
     reason = models.CharField(max_length=255, default="Scheduled inspection")
@@ -288,8 +332,14 @@ class MaintenanceBlock(models.Model):
 
     class Meta:
         ordering = ["starts_at"]
-        indexes = [models.Index(fields=["aircraft", "starts_at", "ends_at"], name="maintenance_window_idx")]
-        constraints = [models.CheckConstraint(condition=Q(ends_at__gt=F("starts_at")), name="maintenance_times_ordered")]
+        indexes = [
+            models.Index(fields=["aircraft", "starts_at", "ends_at"], name="maintenance_window_idx")
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(ends_at__gt=F("starts_at")), name="maintenance_times_ordered"
+            )
+        ]
 
     def clean(self) -> None:
         super().clean()

@@ -1,0 +1,55 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="description" content="A simulated Django flight-operations scheduling showcase.">
+    <title>{% block title %}Northstar Operations{% endblock %}</title>
+    <link rel="icon" href="{% static 'tracker/images/aircraft-silhouette.svg' %}" type="image/svg+xml">
+    <link rel="stylesheet" href="{% static 'tracker/css/operations.css' %}">
+    <script src="{% static 'tracker/js/operations.js' %}" defer></script>
+</head>
+<body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <header class="site-header">
+        <div class="shell header-grid">
+            <a class="brand" href="{% url 'tracker:flight_board' %}" aria-label="Northstar operations board">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 42 42"><path d="M4 25h12L28 5h5l-5 20h9l2 4H27l-4 9h-4l1-9H7z"/></svg>
+                </span>
+                <span>
+                    <strong>NORTHSTAR</strong>
+                    <small>SIMULATED OPERATIONS</small>
+                </span>
+            </a>
+            <nav class="primary-nav" aria-label="Primary navigation">
+                <a href="{% url 'tracker:flight_board' %}">Flight board</a>
+                <a href="{% url 'admin:index' %}">Admin</a>
+            </nav>
+            <div class="clock-cluster">
+                <div>
+                    <span class="instrument-label">UTC · server authority</span>
+                    <time class="instrument-value" data-server-time>{{ generated_at|default:"Awaiting data" }}</time>
+                </div>
+                <div>
+                    <span class="instrument-label">Your device time</span>
+                    <time class="instrument-value" data-device-clock>--:--:--</time>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main id="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="shell footer-grid">
+            <p>Northstar is a portfolio simulation—not real ADS-B or airline operational data.</p>
+            <p>Django · UTC storage · deterministic schedules</p>
+        </div>
+    </footer>
+</body>
+</html>

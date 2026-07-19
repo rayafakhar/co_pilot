@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Iterable
 
 from tracker.models import Flight, MaintenanceBlock
 
@@ -46,32 +46,49 @@ def validate_schedule(
 
         for flight in itinerary:
             if flight.departure_airport_id == flight.arrival_airport_id:
-                violations.append(_violation("same_airport", "Departure and arrival match.", flight))
+                violations.append(
+                    _violation("same_airport", "Departure and arrival match.", flight)
+                )
             if flight.scheduled_arrival <= flight.scheduled_departure:
                 violations.append(_violation("time_order", "Scheduled times are reversed.", flight))
             if flight.actual_arrival and (
                 not flight.actual_departure or flight.actual_arrival <= flight.actual_departure
             ):
-                violations.append(_violation("actual_time", "Actual timestamps are incoherent.", flight))
+                violations.append(
+                    _violation("actual_time", "Actual timestamps are incoherent.", flight)
+                )
             if flight.status == Flight.Status.CANCELLED and (
                 flight.actual_departure or flight.actual_arrival or flight.diversion_airport_id
             ):
-                violations.append(_violation("cancelled_movement", "Cancelled flight moves aircraft.", flight))
-            if flight.diversion_airport_id in {flight.departure_airport_id, flight.arrival_airport_id}:
-                violations.append(_violation("invalid_diversion", "Diversion airport is not distinct.", flight))
+                violations.append(
+                    _violation("cancelled_movement", "Cancelled flight moves aircraft.", flight)
+                )
+            if flight.diversion_airport_id in {
+                flight.departure_airport_id,
+                flight.arrival_airport_id,
+            }:
+                violations.append(
+                    _violation("invalid_diversion", "Diversion airport is not distinct.", flight)
+                )
 
             distance = float(flight.distance_km)
             if distance > practical_range_km(aircraft.aircraft_type):
-                violations.append(_violation("range", "Route exceeds practical aircraft range.", flight))
+                violations.append(
+                    _violation("range", "Route exceeds practical aircraft range.", flight)
+                )
             if distance > 0:
                 expected = calculate_duration(distance, aircraft.aircraft_type).total_minutes
                 tolerance = max(20, round(expected * 0.20))
                 if abs(flight.planned_duration_minutes - expected) > tolerance:
-                    violations.append(_violation("duration", "Planned duration is implausible.", flight))
+                    violations.append(
+                        _violation("duration", "Planned duration is implausible.", flight)
+                    )
 
             if current_airport_id and flight.departure_airport_id != current_airport_id:
                 violations.append(
-                    _violation("continuity", "Flight does not start at the aircraft location.", flight)
+                    _violation(
+                        "continuity", "Flight does not start at the aircraft location.", flight
+                    )
                 )
 
             cancelled = flight.status == Flight.Status.CANCELLED
@@ -82,7 +99,9 @@ def validate_schedule(
                     previous_end = effective_arrival(previous_operating)
                     required = timedelta(minutes=aircraft.aircraft_type.minimum_turnaround_minutes)
                     if start < previous_end:
-                        violations.append(_violation("overlap", "Aircraft operations overlap.", flight))
+                        violations.append(
+                            _violation("overlap", "Aircraft operations overlap.", flight)
+                        )
                     elif start < previous_end + required:
                         violations.append(
                             _violation("turnaround", "Minimum turnaround is not respected.", flight)

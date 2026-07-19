@@ -1,0 +1,51 @@
+{% for row in rows %}
+<tr data-flight-id="{{ row.id }}" class="{% if row.status_code == 'cancelled' or row.status_code == 'diverted' %}row--disrupted{% elif row.status_code == 'delayed' %}row--delayed{% endif %}">
+    <td data-label="Flight">
+        <a class="flight-number" href="{{ row.flight_url }}">{{ row.flight_number }}</a>
+        <span class="muted-line">{{ row.flight_type_label }}</span>
+    </td>
+    <td data-label="Route">
+        <div class="route-lockup">
+            <span><strong>{{ row.departure_code }}</strong><small>{{ row.departure_city }}</small></span>
+            <span class="route-line" aria-hidden="true"><i></i></span>
+            <span><strong>{{ row.arrival_code }}</strong><small>{{ row.arrival_city }}</small></span>
+        </div>
+        {% if row.diverted %}<span class="diversion-note">Resulting location: {{ row.result_code }}</span>{% endif %}
+    </td>
+    <td data-label="Departure">
+        <time datetime="{{ row.scheduled_departure_iso }}" class="time-primary">{{ row.effective_departure_local }}</time>
+        <span class="muted-line">{{ row.effective_departure_utc }}</span>
+        {% if row.departure_changed %}<span class="schedule-note">Scheduled {{ row.scheduled_departure_local }}</span>{% endif %}
+    </td>
+    <td data-label="Arrival">
+        <time datetime="{{ row.scheduled_arrival_iso }}" class="time-primary">{{ row.effective_arrival_local }}</time>
+        <span class="muted-line">{{ row.effective_arrival_utc }}</span>
+        {% if row.arrival_changed %}<span class="schedule-note">Scheduled {{ row.scheduled_arrival_local }}</span>{% endif %}
+    </td>
+    <td data-label="Aircraft">
+        <a class="aircraft-link" href="{{ row.aircraft_url }}">{{ row.aircraft_registration }}</a>
+        <span class="muted-line">{{ row.aircraft_name }}</span>
+    </td>
+    <td data-label="Operation">
+        <strong>{{ row.gate }}</strong>
+        <span class="muted-line">{{ row.distance }} · {{ row.duration }}</span>
+    </td>
+    <td data-label="Status">
+        <span class="status status--{{ row.status_code }}"><i aria-hidden="true"></i>{{ row.status_label }}</span>
+        {% if row.delay_minutes %}<span class="delay-note">+{{ row.delay_minutes }} min</span>{% endif %}
+        {% if row.progress != None %}
+        <div class="progress" aria-label="Estimated journey progress {{ row.progress }} percent">
+            <span style="width: {{ row.progress }}%"></span>
+        </div>
+        <small class="progress-label">Estimated journey progress · {{ row.progress }}%</small>
+        {% endif %}
+    </td>
+</tr>
+{% empty %}
+<tr class="empty-row">
+    <td colspan="7">
+        <strong>No movements match this view.</strong>
+        <span>Adjust the filters or generate a schedule with <code>python manage.py generate_data --clear</code>.</span>
+    </td>
+</tr>
+{% endfor %}

@@ -37,9 +37,13 @@ def get_flight_status(flight: Flight, at_time: datetime | None = None) -> Flight
         raise ValueError("Status evaluation requires a timezone-aware instant.")
     if flight.status == Flight.Status.CANCELLED:
         return FlightStatusResult(Flight.Status.CANCELLED, Flight.Status.CANCELLED.label)
-    if flight.diversion_airport_id and flight.status == Flight.Status.DIVERTED:
+    if (
+        flight.diversion_airport_id
+        and flight.status == Flight.Status.DIVERTED
+        and at_time >= effective_departure(flight)
+    ):
         return FlightStatusResult(Flight.Status.DIVERTED, Flight.Status.DIVERTED.label)
-    if flight.actual_arrival:
+    if flight.actual_arrival and at_time >= flight.actual_arrival:
         return FlightStatusResult(Flight.Status.ARRIVED, Flight.Status.ARRIVED.label)
 
     departure = effective_departure(flight)
@@ -47,7 +51,11 @@ def get_flight_status(flight: Flight, at_time: datetime | None = None) -> Flight
     if at_time >= arrival:
         return FlightStatusResult(Flight.Status.ARRIVED, Flight.Status.ARRIVED.label)
     if at_time >= departure:
-        code = Flight.Status.DEPARTED if at_time < departure + DEPARTED_WINDOW else Flight.Status.EN_ROUTE
+        code = (
+            Flight.Status.DEPARTED
+            if at_time < departure + DEPARTED_WINDOW
+            else Flight.Status.EN_ROUTE
+        )
         return FlightStatusResult(code, Flight.Status(code).label)
     delayed = (
         flight.estimated_departure is not None

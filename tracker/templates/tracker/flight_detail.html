@@ -1,0 +1,77 @@
+{% extends "tracker/base.html" %}
+
+{% block title %}{{ flight.flight_number }} · Northstar Operations{% endblock %}
+
+{% block content %}
+<section class="detail-hero detail-hero--flight">
+    <div class="shell">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+            <a href="{% url 'tracker:flight_board' %}">Flight board</a><span>/</span><span>{{ flight.flight_number }}</span>
+        </nav>
+        <div class="flight-hero-grid">
+            <div>
+                <p class="eyebrow">{{ row.flight_type_label }} operation</p>
+                <h1>{{ flight.flight_number }}</h1>
+                <p><a href="{{ row.aircraft_url }}">{{ row.aircraft_registration }}</a> · {{ row.aircraft_type }}</p>
+            </div>
+            <div class="hero-route">
+                <span><strong>{{ row.departure_code }}</strong><small>{{ row.departure_city }}</small></span>
+                <i aria-hidden="true"></i>
+                <span><strong>{{ row.arrival_code }}</strong><small>{{ row.arrival_city }}</small></span>
+            </div>
+            <div><span class="status status--{{ row.status_code }}"><i></i>{{ row.status_label }}</span>{% if row.delay_minutes %}<p class="delay-note">+{{ row.delay_minutes }} min</p>{% endif %}</div>
+        </div>
+    </div>
+</section>
+
+<div class="shell flight-detail-grid">
+    <section class="content-panel">
+        <p class="eyebrow">Schedule comparison</p>
+        <h2>Operational times</h2>
+        <div class="time-comparison">
+            <article>
+                <h3>Departure · {{ row.departure_timezone }}</h3>
+                <dl>
+                    <div><dt>Scheduled local</dt><dd>{{ row.scheduled_departure_local }}</dd></div>
+                    <div><dt>Current estimate local</dt><dd>{{ row.effective_departure_local }}</dd></div>
+                    <div><dt>Authoritative UTC</dt><dd>{{ row.effective_departure_utc }}</dd></div>
+                    <div><dt>Terminal / gate</dt><dd>{{ flight.departure_terminal|default:"—" }} / {{ row.gate }}</dd></div>
+                </dl>
+            </article>
+            <article>
+                <h3>Arrival · {{ row.arrival_timezone }}</h3>
+                <dl>
+                    <div><dt>Scheduled local</dt><dd>{{ row.scheduled_arrival_local }}</dd></div>
+                    <div><dt>Current estimate local</dt><dd>{{ row.effective_arrival_local }}</dd></div>
+                    <div><dt>Authoritative UTC</dt><dd>{{ row.effective_arrival_utc }}</dd></div>
+                    <div><dt>Terminal / gate</dt><dd>{{ flight.arrival_terminal|default:"—" }} / {{ flight.arrival_gate|default:"TBA" }}</dd></div>
+                </dl>
+            </article>
+        </div>
+        {% if row.progress != None %}
+        <div class="large-progress">
+            <div><span>Estimated journey progress</span><strong>{{ row.progress }}%</strong></div>
+            <div class="progress"><span style="width: {{ row.progress }}%"></span></div>
+            <small>Elapsed-time estimate only; no live position feed is used.</small>
+        </div>
+        {% endif %}
+    </section>
+
+    <aside class="content-panel">
+        <p class="eyebrow">Planning assumptions</p>
+        <h2>Operation details</h2>
+        <dl class="technical-list">
+            <div><dt>Aircraft</dt><dd><a href="{{ row.aircraft_url }}">{{ row.aircraft_registration }}</a></dd></div>
+            <div><dt>Distance</dt><dd>{{ row.distance }}</dd></div>
+            <div><dt>Planned block time</dt><dd>{{ row.duration }}</dd></div>
+            <div><dt>Flight type</dt><dd>{{ row.flight_type_label }}</dd></div>
+            <div><dt>Resulting location</dt><dd>{{ row.result_code }}</dd></div>
+            <div><dt>Delay</dt><dd>{{ row.delay_minutes }} min</dd></div>
+        </dl>
+        {% if flight.cancelled_reason %}<div class="notice notice--danger"><strong>Cancellation</strong><p>{{ flight.cancelled_reason }}</p></div>{% endif %}
+        {% if row.diverted %}<div class="notice notice--warning"><strong>Diversion</strong><p>The simulated aircraft chain continues from {{ row.result_code }}.</p></div>{% endif %}
+        {% if flight.notes %}<div class="notice"><strong>Operational note</strong><p>{{ flight.notes }}</p></div>{% endif %}
+        <p class="fine-print">Status calculated at {{ generated_at }} by the server.</p>
+    </aside>
+</div>
+{% endblock %}

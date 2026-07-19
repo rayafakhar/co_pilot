@@ -22,8 +22,16 @@ class DurationBreakdown:
 
     @property
     def total_minutes(self) -> int:
-        return sum((self.taxi_out_minutes, self.climb_minutes, self.cruise_minutes,
-                    self.descent_minutes, self.taxi_in_minutes, self.variability_minutes))
+        return sum(
+            (
+                self.taxi_out_minutes,
+                self.climb_minutes,
+                self.cruise_minutes,
+                self.descent_minutes,
+                self.taxi_in_minutes,
+                self.variability_minutes,
+            )
+        )
 
 
 def haversine_distance_km(origin: Airport, destination: Airport) -> float:
@@ -32,7 +40,9 @@ def haversine_distance_km(origin: Airport, destination: Airport) -> float:
         raise ValueError("Both airports require latitude and longitude for route calculations.")
     lat1, lon1, lat2, lon2 = map(
         radians,
-        map(float, (origin.latitude, origin.longitude, destination.latitude, destination.longitude)),
+        map(
+            float, (origin.latitude, origin.longitude, destination.latitude, destination.longitude)
+        ),
     )
     delta_lat = lat2 - lat1
     delta_lon = lon2 - lon1

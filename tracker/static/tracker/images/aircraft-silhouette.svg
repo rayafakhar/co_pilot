@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">Generic twin-engine passenger aircraft silhouette</title>
+  <desc id="desc">An original geometric side-view illustration used for simulated aircraft records.</desc>
+  <defs>
+    <linearGradient id="body" x1="0" x2="1">
+      <stop offset="0" stop-color="#8aa0b2"/>
+      <stop offset=".45" stop-color="#eef7fb"/>
+      <stop offset="1" stop-color="#6c8193"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#d8e7ef"/>
+      <stop offset="1" stop-color="#536879"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(30 25)">
+    <path fill="url(#body)" d="M49 179c56-13 134-24 235-29l540-22c61-3 127-22 220-73l27-13-13 58c-6 27-20 48-45 64l-108 67c-33 21-72 32-111 32H271c-85 0-158-13-222-39l-34-14c-20-8-20-24 0-30z"/>
+    <path fill="url(#wing)" d="M475 173 685 17h63l-116 162 229 23-21 34-280 3-111 79h-65l73-82-173-15 23-31z"/>
+    <path fill="#5fc9eb" d="m914 129 105-96h44l-28 107z"/>
+    <path fill="#132838" d="M828 139c63-6 130-27 196-64l-8 26c-49 32-111 54-186 66z"/>
+    <g fill="#1b3445">
+      <path d="M649 226h98c21 0 38 17 38 38s-17 38-38 38h-42c-25 0-47-15-56-38l-15-38z"/>
+      <path d="M450 226h92l-15 38c-9 23-31 38-56 38h-34c-21 0-38-17-38-38s17-38 38-38z"/>
+    </g>
+    <g fill="#294658">
+      <circle cx="738" cy="264" r="25"/><circle cx="463" cy="264" r="25"/>
+    </g>
+    <g fill="#53c7ed">
+      <path d="M858 142h22v9h-22zM889 137h22v9h-22zM920 130h22v9h-22zM951 120h22v9h-22z"/>
+    </g>
+  </g>
+</svg>

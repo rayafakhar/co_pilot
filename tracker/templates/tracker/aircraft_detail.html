@@ -1,0 +1,146 @@
+{% extends "tracker/base.html" %}
+{% load static %}
+
+{% block title %}{{ aircraft.registration }} · Northstar Operations{% endblock %}
+
+{% block content %}
+<section class="detail-hero">
+    <div class="shell">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+            <a href="{% url 'tracker:flight_board' %}">Flight board</a>
+            <span aria-hidden="true">/</span>
+            <span>{{ aircraft.registration }}</span>
+        </nav>
+        <div class="aircraft-hero-grid">
+            <div class="aircraft-portrait">
+                <div class="bearing-markers" aria-hidden="true"><span>270</span><span>090</span></div>
+                <img src="{% static aircraft.aircraft_type.image %}" alt="{{ aircraft.aircraft_type.image_alt_text }}">
+                <p>Repository-local illustration · not to scale</p>
+            </div>
+            <div class="aircraft-identity">
+                <p class="eyebrow">Fleet asset / {{ aircraft.aircraft_type.icao_type_code }}</p>
+                <h1>{{ aircraft.registration }}</h1>
+                <p class="aircraft-model">{{ aircraft.aircraft_type.manufacturer }} {{ aircraft.aircraft_type.model }}</p>
+                <div class="identity-meta">
+                    <span>{{ aircraft.operator }}</span>
+                    <span>Base {{ aircraft.base_airport.display_code|default:"—" }}</span>
+                    <span>Built {{ aircraft.manufactured_year|default:"Not recorded" }}</span>
+                </div>
+                <div class="operational-banner">
+                    <span class="live-dot" aria-hidden="true"></span>
+                    <div><small>Current simulated state</small><strong>{{ snapshot.operational_state }}</strong></div>
+                </div>
+            </div>
+            <dl class="location-stack">
+                <div><dt>Resulting location</dt><dd>{% if snapshot.current_airport %}{{ snapshot.current_airport.display_code }}<small>{{ snapshot.current_airport.city }}</small>{% else %}Unknown{% endif %}</dd></div>
+                <div><dt>Next movement</dt><dd>{% if snapshot.next_flight %}<a href="{{ snapshot.next_flight.flight_url }}">{{ snapshot.next_flight.flight_number }}</a><small>{{ snapshot.next_flight.departure_code }} → {{ snapshot.next_flight.arrival_code }}</small>{% else %}None planned{% endif %}</dd></div>
+            </dl>
+        </div>
+    </div>
+</section>
+
+<div class="shell detail-layout">
+    <div class="detail-main">
+        <section class="content-panel" aria-labelledby="current-operation-title">
+            <header class="section-heading">
+                <div><p class="eyebrow">At {{ generated_at }}</p><h2 id="current-operation-title">Current operation</h2></div>
+            </header>
+            {% if snapshot.current_flight %}
+            <div class="current-operation">
+                <div>
+                    <span class="status status--{{ snapshot.current_flight.status_code }}"><i></i>{{ snapshot.current_flight.status_label }}</span>
+                    <h3><a href="{{ snapshot.current_flight.flight_url }}">{{ snapshot.current_flight.flight_number }}</a></h3>
+                    <p>{{ snapshot.current_flight.departure_code }} <span>→</span> {{ snapshot.current_flight.result_code }}</p>
+                </div>
+                <dl>
+                    <div><dt>Departed</dt><dd>{{ snapshot.current_flight.effective_departure_utc }}</dd></div>
+                    <div><dt>Estimated arrival</dt><dd>{{ snapshot.current_flight.effective_arrival_utc }}</dd></div>
+                    <div><dt>Elapsed</dt><dd>{{ snapshot.current_flight.elapsed }}</dd></div>
+                    <div><dt>Remaining</dt><dd>{{ snapshot.current_flight.remaining }}</dd></div>
+                    <div><dt>Delay</dt><dd>{{ snapshot.current_flight.delay_minutes }} min</dd></div>
+                </dl>
+                <div class="large-progress">
+                    <div><span>Estimated journey progress</span><strong>{{ snapshot.current_flight.progress }}%</strong></div>
+                    <div class="progress"><span style="width: {{ snapshot.current_flight.progress }}%"></span></div>
+                    <small>Time-based simulation; this is not a live GPS or ADS-B position.</small>
+                </div>
+            </div>
+            {% else %}
+            <div class="ground-operation">
+                <span class="ground-icon" aria-hidden="true">GND</span>
+                <div>
+                    <h3>{{ snapshot.operational_state }}</h3>
+                    <p>{% if snapshot.current_airport %}At {{ snapshot.current_airport.name }} ({{ snapshot.current_airport.display_code }}).{% else %}No resulting airport is recorded.{% endif %}</p>
+                    {% if snapshot.turnaround_remaining %}<p>Minimum turnaround completes in <strong>{{ snapshot.turnaround_remaining }}</strong>.</p>{% endif %}
+                    {% if snapshot.current_maintenance %}<p>{{ snapshot.current_maintenance.reason }} until {{ snapshot.current_maintenance.ends_at|date:"d M Y H:i" }} UTC.</p>{% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </section>
+
+        <section class="content-panel" aria-labelledby="timeline-title">
+            <header class="section-heading">
+                <div><p class="eyebrow">Chronological aircraft chain</p><h2 id="timeline-title">Operations timeline</h2></div>
+                <span>All times UTC</span>
+            </header>
+            <ol class="timeline">
+                {% for event in snapshot.timeline %}
+                <li class="timeline--{{ event.status_code }}">
+                    <span class="timeline-node" aria-hidden="true"></span>
+                    <div class="timeline-time">{{ event.time }}</div>
+                    <div class="timeline-card">
+                        <div>
+                            {% if event.kind == "flight" %}<a class="flight-number" href="{{ event.flight_url }}">{{ event.flight_number }}</a>{% else %}<strong>{{ event.title }}</strong>{% endif %}
+                            <span class="status status--{{ event.status_code }}"><i></i>{{ event.status_label }}</span>
+                        </div>
+                        <p>{{ event.route }}</p>
+                        <small>{{ event.type_label }}{% if event.delay %} · +{{ event.delay }} min{% endif %}</small>
+                    </div>
+                </li>
+                {% empty %}
+                <li class="timeline-empty">No operations have been generated for this aircraft.</li>
+                {% endfor %}
+            </ol>
+        </section>
+    </div>
+
+    <aside class="detail-sidebar">
+        <section class="content-panel">
+            <p class="eyebrow">Configured performance</p>
+            <h2>Technical profile</h2>
+            <dl class="technical-list">
+                <div><dt>ICAO type</dt><dd>{{ aircraft.aircraft_type.icao_type_code }}</dd></div>
+                <div><dt>Category</dt><dd>{{ aircraft.aircraft_type.get_category_display }}</dd></div>
+                <div><dt>Capacity</dt><dd>{{ aircraft.aircraft_type.passenger_capacity }} seats</dd></div>
+                <div><dt>Practical max range</dt><dd>{{ aircraft.aircraft_type.maximum_range_km }} km</dd></div>
+                <div><dt>Typical cruise</dt><dd>{{ aircraft.aircraft_type.typical_cruise_speed_kmh }} km/h</dd></div>
+                <div><dt>Minimum turn</dt><dd>{{ aircraft.aircraft_type.minimum_turnaround_minutes }} min</dd></div>
+                <div><dt>Wingspan</dt><dd>{{ aircraft.aircraft_type.wingspan_m|default:"—" }} m</dd></div>
+                <div><dt>Length</dt><dd>{{ aircraft.aircraft_type.length_m|default:"—" }} m</dd></div>
+                <div><dt>Crew assumption</dt><dd>{{ aircraft.aircraft_type.crew_count }}</dd></div>
+                <div><dt>Serial</dt><dd>{{ aircraft.serial_number|default:"Not recorded" }}</dd></div>
+            </dl>
+            <p class="fine-print">Rounded simulation inputs; not certified planning data.</p>
+        </section>
+
+        <section class="content-panel">
+            <p class="eyebrow">Generated-period measures</p>
+            <h2>Route history</h2>
+            <div class="metric-grid">
+                <div><strong>{{ snapshot.completed_count }}</strong><span>Completed</span></div>
+                <div><strong>{{ snapshot.route_count }}</strong><span>Routes</span></div>
+                <div><strong>{{ snapshot.utilization }}%</strong><span>Utilization</span></div>
+                <div><strong>{{ snapshot.on_time_percentage }}%</strong><span>On time ≤15m</span></div>
+            </div>
+            <dl class="technical-list compact">
+                <div><dt>Total distance</dt><dd>{{ snapshot.total_distance }}</dd></div>
+                <div><dt>Average delay</dt><dd>{{ snapshot.average_delay }} min</dd></div>
+            </dl>
+            <h3 class="subheading">Frequent airports</h3>
+            <ul class="frequency-list">
+                {% for item in snapshot.frequent_airports %}<li><span>{{ item.0 }}</span><strong>{{ item.1 }} movements</strong></li>{% empty %}<li>No completed movement history.</li>{% endfor %}
+            </ul>
+        </section>
+    </aside>
+</div>
+{% endblock %}
