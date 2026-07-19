@@ -1,4 +1,5 @@
 # Virtual Environment
+.venv/
 venv/
 env/
 ENV/
@@ -10,6 +11,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+__pypackages__/
 build/
 develop-eggs/
 dist/
@@ -25,11 +27,14 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+pip-wheel-metadata/
 
 # Django
 *.log
-db.sqlite3
-db.sqlite3-journal
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-shm
+*.sqlite3-wal
 /media
 /static
 /staticfiles
@@ -42,17 +47,26 @@ db.sqlite3-journal
 # IDE
 .vscode/
 .idea/
+.history/
 *.swp
 *.swo
 *~
 .DS_Store
+Thumbs.db
+Desktop.ini
 
-# Coverage
+# Testing, coverage, and static analysis
 htmlcov/
 .tox/
+.nox/
 .coverage
 .coverage.*
 .cache
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.pyre/
+.pytype/
 nosetests.xml
 coverage.xml
 *.cover
