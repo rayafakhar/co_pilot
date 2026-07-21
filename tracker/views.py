@@ -12,8 +12,10 @@ from django.utils import timezone
 
 from .models import Aircraft, Airport, Flight, MaintenanceBlock
 from .services.analytics import aircraft_snapshot
+from .services.distance import practical_range_km
 from .services.presentation import serialize_flight, utc_iso, utc_label
 
+BOARD_CANDIDATE_LIMIT = 1000
 BOARD_LIMIT = 250
 
 
@@ -60,14 +62,18 @@ def _board_rows(request, at_time):
             scheduled_departure__lte=at_time + timedelta(days=14),
         )
 
+    # Derived lifecycle states cannot be filtered safely in SQL. Keep evaluation bounded,
+    # but apply the public result limit only after the authoritative status filter.
     rows = [
         serialize_flight(item, at_time)
-        for item in queryset.order_by("scheduled_departure", "flight_number")[:BOARD_LIMIT]
+        for item in queryset.order_by("scheduled_departure", "flight_number")[
+            :BOARD_CANDIDATE_LIMIT
+        ]
     ]
     valid_statuses = {choice for choice, _ in Flight.Status.choices}
     if status in valid_statuses:
         rows = [row for row in rows if row["status_code"] == status]
-    return rows
+    return rows[:BOARD_LIMIT]
 
 
 def _summary(rows):
@@ -136,6 +142,7 @@ def aircraft_detail(request, registration):
         {
             "aircraft": aircraft,
             "snapshot": aircraft_snapshot(aircraft, flights, blocks, at_time),
+            "practical_range_km": round(practical_range_km(aircraft.aircraft_type)),
             "generated_at": utc_label(at_time),
         },
     )

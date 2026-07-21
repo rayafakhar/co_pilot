@@ -39,7 +39,7 @@
                 </dl>
             </article>
             <article>
-                <h3>Arrival · {{ row.arrival_timezone }}</h3>
+                <h3>{% if row.diverted %}Resulting arrival{% else %}Arrival{% endif %} · {{ row.result_timezone }}</h3>
                 <dl>
                     <div><dt>Scheduled local</dt><dd>{{ row.scheduled_arrival_local }}</dd></div>
                     <div><dt>Current estimate local</dt><dd>{{ row.effective_arrival_local }}</dd></div>

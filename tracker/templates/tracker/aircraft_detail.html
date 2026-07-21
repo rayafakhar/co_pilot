@@ -119,7 +119,8 @@
                 <div><dt>ICAO type</dt><dd>{{ aircraft.aircraft_type.icao_type_code }}</dd></div>
                 <div><dt>Category</dt><dd>{{ aircraft.aircraft_type.get_category_display }}</dd></div>
                 <div><dt>Capacity</dt><dd>{{ aircraft.aircraft_type.passenger_capacity }} seats</dd></div>
-                <div><dt>Practical max range</dt><dd>{{ aircraft.aircraft_type.maximum_range_km }} km</dd></div>
+                <div><dt>Configured maximum range</dt><dd>{{ aircraft.aircraft_type.maximum_range_km }} km</dd></div>
+                <div><dt>Simulation practical range</dt><dd>{{ practical_range_km }} km</dd></div>
                 <div><dt>Typical cruise</dt><dd>{{ aircraft.aircraft_type.typical_cruise_speed_kmh }} km/h</dd></div>
                 <div><dt>Minimum turn</dt><dd>{{ aircraft.aircraft_type.minimum_turnaround_minutes }} min</dd></div>
                 <div><dt>Wingspan</dt><dd>{{ aircraft.aircraft_type.wingspan_m|default:"—" }} m</dd></div>

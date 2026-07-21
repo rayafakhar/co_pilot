@@ -25,7 +25,10 @@
 
     const rows = board.querySelector("[data-flight-rows]");
     const refreshState = board.querySelector("[data-refresh-status]");
-    let polling = false;
+    let activeController = null;
+    let pollTimer = null;
+    let requestSequence = 0;
+    let appliedSequence = 0;
 
     function endpointUrl() {
         const url = new URL(board.dataset.endpoint, window.location.origin);
@@ -34,15 +37,22 @@
     }
 
     async function refreshBoard() {
-        if (polling || document.hidden) return;
-        polling = true;
+        if (document.hidden) return;
+        activeController?.abort();
+        const controller = new AbortController();
+        activeController = controller;
+        const sequence = ++requestSequence;
+        board.setAttribute("aria-busy", "true");
         try {
             const response = await fetch(endpointUrl(), {
                 headers: { Accept: "application/json" },
                 cache: "no-store",
+                signal: controller.signal,
             });
             if (!response.ok) throw new Error(`Board request failed: ${response.status}`);
             const payload = await response.json();
+            if (sequence < requestSequence || sequence <= appliedSequence) return;
+            appliedSequence = sequence;
             const focusedHref = rows.contains(document.activeElement)
                 ? document.activeElement.getAttribute("href")
                 : null;
@@ -61,15 +71,37 @@
             refreshState.textContent = `Updated ${payload.generated_at_label}`;
             refreshState.parentElement.classList.remove("is-error");
         } catch (error) {
+            if (error.name === "AbortError") return;
             refreshState.textContent = "Live update unavailable · showing last server response";
             refreshState.parentElement.classList.add("is-error");
         } finally {
-            polling = false;
+            if (activeController === controller) {
+                activeController = null;
+                board.setAttribute("aria-busy", "false");
+            }
         }
     }
 
-    window.setInterval(refreshBoard, 20_000);
+    function startPolling() {
+        if (pollTimer === null) pollTimer = window.setInterval(refreshBoard, 20_000);
+    }
+
+    function stopPolling() {
+        if (pollTimer !== null) window.clearInterval(pollTimer);
+        pollTimer = null;
+        activeController?.abort();
+        activeController = null;
+        board.setAttribute("aria-busy", "false");
+    }
+
+    startPolling();
     document.addEventListener("visibilitychange", () => {
-        if (!document.hidden) refreshBoard();
+        if (document.hidden) {
+            stopPolling();
+        } else {
+            startPolling();
+            refreshBoard();
+        }
     });
+    window.addEventListener("pagehide", stopPolling, { once: true });
 })();

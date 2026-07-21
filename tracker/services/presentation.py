@@ -46,7 +46,6 @@ def serialize_flight(flight: Flight, at_time: datetime) -> dict[str, object]:
     )
     result_airport = flight.diversion_airport or flight.arrival_airport
     return {
-        "id": flight.pk,
         "flight_number": flight.flight_number,
         "flight_url": reverse("tracker:flight_detail", args=[flight.flight_number]),
         "flight_type": flight.flight_type,
@@ -62,6 +61,7 @@ def serialize_flight(flight: Flight, at_time: datetime) -> dict[str, object]:
         "arrival_city": flight.arrival_airport.city,
         "arrival_timezone": flight.arrival_airport.timezone,
         "result_code": result_airport.display_code,
+        "result_timezone": result_airport.timezone,
         "diverted": flight.diversion_airport_id is not None,
         "scheduled_departure_utc": utc_label(flight.scheduled_departure),
         "scheduled_departure_iso": utc_iso(flight.scheduled_departure),
@@ -69,6 +69,7 @@ def serialize_flight(flight: Flight, at_time: datetime) -> dict[str, object]:
             flight.scheduled_departure, flight.departure_airport.timezone
         ),
         "effective_departure_utc": utc_label(departure),
+        "effective_departure_iso": utc_iso(departure),
         "effective_departure_local": airport_local_label(
             departure, flight.departure_airport.timezone
         ),
@@ -78,6 +79,7 @@ def serialize_flight(flight: Flight, at_time: datetime) -> dict[str, object]:
             flight.scheduled_arrival, flight.arrival_airport.timezone
         ),
         "effective_arrival_utc": utc_label(arrival),
+        "effective_arrival_iso": utc_iso(arrival),
         "effective_arrival_local": airport_local_label(arrival, result_airport.timezone),
         "departure_changed": departure != flight.scheduled_departure,
         "arrival_changed": arrival != flight.scheduled_arrival,

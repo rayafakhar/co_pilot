@@ -1,5 +1,5 @@
 {% for row in rows %}
-<tr data-flight-id="{{ row.id }}" class="{% if row.status_code == 'cancelled' or row.status_code == 'diverted' %}row--disrupted{% elif row.status_code == 'delayed' %}row--delayed{% endif %}">
+<tr data-flight-id="{{ row.flight_number }}" class="{% if row.status_code == 'cancelled' or row.status_code == 'diverted' %}row--disrupted{% elif row.status_code == 'delayed' %}row--delayed{% endif %}">
     <td data-label="Flight">
         <a class="flight-number" href="{{ row.flight_url }}">{{ row.flight_number }}</a>
         <span class="muted-line">{{ row.flight_type_label }}</span>
@@ -13,12 +13,12 @@
         {% if row.diverted %}<span class="diversion-note">Resulting location: {{ row.result_code }}</span>{% endif %}
     </td>
     <td data-label="Departure">
-        <time datetime="{{ row.scheduled_departure_iso }}" class="time-primary">{{ row.effective_departure_local }}</time>
+        <time datetime="{{ row.effective_departure_iso }}" class="time-primary">{{ row.effective_departure_local }}</time>
         <span class="muted-line">{{ row.effective_departure_utc }}</span>
         {% if row.departure_changed %}<span class="schedule-note">Scheduled {{ row.scheduled_departure_local }}</span>{% endif %}
     </td>
     <td data-label="Arrival">
-        <time datetime="{{ row.scheduled_arrival_iso }}" class="time-primary">{{ row.effective_arrival_local }}</time>
+        <time datetime="{{ row.effective_arrival_iso }}" class="time-primary">{{ row.effective_arrival_local }}</time>
         <span class="muted-line">{{ row.effective_arrival_utc }}</span>
         {% if row.arrival_changed %}<span class="schedule-note">Scheduled {{ row.scheduled_arrival_local }}</span>{% endif %}
     </td>
