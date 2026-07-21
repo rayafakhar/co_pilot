@@ -120,7 +120,17 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_ROOT = Path(os.getenv("DJANGO_STATIC_ROOT", BASE_DIR / "staticfiles"))
+
+# Public, key-free raster tile defaults for the simulated network map.
+MAP_TILE_URL = os.getenv(
+    "MAP_TILE_URL",
+    "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+)
+MAP_TILE_ATTRIBUTION = os.getenv(
+    "MAP_TILE_ATTRIBUTION",
+    "© OpenStreetMap contributors",
+)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

@@ -15,6 +15,9 @@ __pypackages__/
 build/
 develop-eggs/
 dist/
+node_modules/
+!tracker/static/tracker/dist/
+!tracker/static/tracker/dist/**
 downloads/
 eggs/
 .eggs/
