@@ -22,6 +22,7 @@ import {
 } from "./presentation.js";
 import {
     createFlightState,
+    flightListSignature,
     reconcileFlightState,
     reconcileSelection,
     shouldAnimate,
@@ -31,6 +32,8 @@ import {
 const root = document.querySelector("[data-network-map]");
 
 if (root) {
+    document.documentElement.classList.add("map-bundle-loaded");
+    document.documentElement.classList.remove("map-bundle-failed");
     const configNode = document.querySelector("#network-map-config");
     let config = null;
     try {
@@ -91,6 +94,7 @@ if (root) {
     let routesVisible = true;
     let fittedInitialNetwork = false;
     let airportsForMap = emptyFeatureCollection();
+    let renderedFlightListSignature = "";
 
     const routeCache = new Map();
     const progressState = new Map();
@@ -184,6 +188,12 @@ if (root) {
     }
 
     function renderFlightList() {
+        const nextSignature = flightListSignature(flightState.flights);
+        if (nextSignature === renderedFlightListSignature) {
+            updateFlightListSelection();
+            return;
+        }
+        renderedFlightListSignature = nextSignature;
         const fragment = document.createDocumentFragment();
         const flights = [...flightState.flights.values()].sort((left, right) =>
             left.flight_number.localeCompare(right.flight_number),
@@ -280,7 +290,7 @@ if (root) {
             simulationMilliseconds,
             routeCache,
             progressState,
-            { authoritativeOnly },
+            { authoritativeOnly, includeStatic: authoritativeOnly },
         );
         if (mapReady) {
             const selectedFlight = selectedFlightNumber
@@ -291,6 +301,7 @@ if (root) {
                 collections,
                 airportsForMap,
                 selectedRouteCollection(selectedFlight, routeCache),
+                { staticSources: authoritativeOnly },
             );
         }
         renderSelectedFlight();
@@ -312,7 +323,7 @@ if (root) {
 
     function applyPayload(payload, sequence) {
         const reconciled = reconcileFlightState(flightState, payload, sequence);
-        if (!reconciled.accepted) return;
+        if (!reconciled.accepted) return false;
         flightState = reconciled;
         latestPayload = payload;
         receivedAt = performance.now();
@@ -335,13 +346,19 @@ if (root) {
             fittedInitialNetwork = true;
         }
         if (payload.simulation.active) {
-            setFeedMessage(authoritativeFeedMessage());
+            const skipped = reconciled.skipped
+                ? ` · ${reconciled.skipped} malformed record${reconciled.skipped === 1 ? "" : "s"} omitted`
+                : "";
+            setFeedMessage(`${authoritativeFeedMessage()}${skipped}`, {
+                stale: reconciled.skipped > 0,
+            });
         } else {
             setFeedMessage("Simulation clock inactive · wall-time fallback", {
                 error: true,
             });
         }
         startAnimation();
+        return true;
     }
 
     async function refreshNetwork() {
@@ -356,7 +373,13 @@ if (root) {
             const payload = await fetchNetworkState(config.dataUrl, {
                 signal: controller.signal,
             });
-            applyPayload(payload, sequence);
+            if (!applyPayload(payload, sequence)) {
+                if (!latestPayload) {
+                    throw new Error("Network map response was stale or malformed.");
+                }
+                setFeedMessage(authoritativeFeedMessage());
+                renderUiState();
+            }
         } catch (error) {
             if (error.name === "AbortError") return;
             dataError = true;

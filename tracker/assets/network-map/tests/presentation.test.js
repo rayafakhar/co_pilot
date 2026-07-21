@@ -65,6 +65,19 @@ describe("map presentation state", () => {
         });
     });
 
+    it("skips static route features during animation-only source updates", () => {
+        const collections = buildMapCollections(
+            new Map([[flight.flight_number, flight]]),
+            Date.parse("2026-07-19T11:00:01Z"),
+            new Map(),
+            new Map(),
+            { includeStatic: false },
+        );
+        expect(collections.routes.features).toEqual([]);
+        expect(collections.completedRoutes.features).toHaveLength(1);
+        expect(collections.aircraft.features).toHaveLength(1);
+    });
+
     it("returns empty collections and selection when no flights are active", () => {
         const collections = buildMapCollections(
             new Map(),

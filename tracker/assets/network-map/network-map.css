@@ -40,6 +40,12 @@
 .map-feed-state.is-stale { color: var(--amber); }
 .map-feed-state.is-error .live-dot { background: var(--red); }
 .map-feed-state.is-stale .live-dot { background: var(--amber); }
+.map-bundle-failure-message { display: none; }
+.map-bundle-failed .map-feed-state { color: var(--red); }
+.map-bundle-failed [data-feed-message] { display: none; }
+.map-bundle-failed .map-bundle-failure-message { display: inline; }
+.map-bundle-failed [data-map-loading] { display: none !important; }
+.map-bundle-failed [data-map-fatal] { display: grid !important; }
 
 .map-telemetry {
     display: grid;

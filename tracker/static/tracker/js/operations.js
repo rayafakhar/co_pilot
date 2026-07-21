@@ -20,6 +20,15 @@
     updateDeviceClock();
     window.setInterval(updateDeviceClock, 1000);
 
+    document.addEventListener("DOMContentLoaded", () => {
+        if (
+            document.querySelector("[data-network-map]") &&
+            !document.documentElement.classList.contains("map-bundle-loaded")
+        ) {
+            document.documentElement.classList.add("map-bundle-failed");
+        }
+    });
+
     const board = document.querySelector("[data-board]");
     if (!board) return;
 

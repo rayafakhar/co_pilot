@@ -9,7 +9,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from tracker.models import Flight, SimulationClock
-from tracker.services.clock import reset_simulation_clock
+from tracker.services.clock import ClockConfigurationError, reset_simulation_clock
 from tracker.services.map_data import network_bounds
 
 from .helpers import aircraft, aircraft_type, airport, flight
@@ -88,6 +88,19 @@ class NetworkMapDataTests(TestCase):
         self.assertEqual(payload["flights"], [])
         self.assertEqual(payload["airports"]["features"], [])
         self.assertIsNone(payload["bounds"])
+
+    def test_invalid_clock_returns_no_store_service_error(self):
+        with (
+            patch("tracker.views.timezone.now", return_value=WALL_TIME),
+            patch(
+                "tracker.views.get_simulation_clock",
+                side_effect=ClockConfigurationError("invalid clock"),
+            ),
+        ):
+            response = self.client.get(reverse("tracker:network_map_data"))
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response["Cache-Control"], "no-store")
+        self.assertEqual(response.json()["error"], "simulation_clock_invalid")
 
     def test_active_flight_payload_uses_public_identity_and_lon_lat_order(self):
         item = self.create_flight()
@@ -218,6 +231,9 @@ class NetworkMapDataTests(TestCase):
         self.assertContains(response, "Live simulation")
         self.assertContains(response, "/static/tracker/dist/network-map.css")
         self.assertContains(response, "/static/tracker/dist/network-map.js")
+        self.assertContains(response, "map-bundle-failed")
+        self.assertContains(response, "Map bundle unavailable")
+        self.assertContains(response, "Open the flight board")
         self.assertContains(response, "https://tiles.example.test/{z}/{x}/{y}.png")
         self.assertContains(response, "Example public tiles")
         self.assertContains(response, "/static/tracker/images/aircraft-map-icon.svg")

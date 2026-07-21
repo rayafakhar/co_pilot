@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     correctedProgress,
     createFlightState,
+    flightListSignature,
     progressAtTime,
     reconcileFlightState,
     reconcileSelection,
@@ -137,5 +138,23 @@ describe("simulation state", () => {
         expect(state.accepted).toBe(true);
         expect(state.skipped).toBe(1);
         expect([...state.flights.keys()]).toEqual(["TS100"]);
+    });
+
+    it("keeps the keyboard-list signature stable for progress-only polls", () => {
+        const flights = new Map([[baseFlight.flight_number, baseFlight]]);
+        const changedProgress = new Map([
+            [baseFlight.flight_number, { ...baseFlight, progress: 75 }],
+        ]);
+        expect(flightListSignature(changedProgress)).toBe(flightListSignature(flights));
+        expect(
+            flightListSignature(
+                new Map([
+                    [
+                        baseFlight.flight_number,
+                        { ...baseFlight, status_code: "diverted" },
+                    ],
+                ]),
+            ),
+        ).not.toBe(flightListSignature(flights));
     });
 });

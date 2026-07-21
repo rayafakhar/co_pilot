@@ -42,6 +42,21 @@ export function createFlightState() {
     };
 }
 
+export function flightListSignature(flights) {
+    return [...flights.values()]
+        .sort((left, right) => left.flight_number.localeCompare(right.flight_number))
+        .map((flight) =>
+            [
+                flight.flight_number,
+                flight.aircraft_registration,
+                flight.status_code,
+                flight.origin?.code,
+                flight.result_destination?.code,
+            ].join(":"),
+        )
+        .join("|");
+}
+
 export function shouldAnimate({
     hidden = false,
     reducedMotion = false,

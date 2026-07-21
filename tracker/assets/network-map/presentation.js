@@ -63,7 +63,7 @@ export function buildMapCollections(
     simulationMilliseconds,
     routeCache,
     progressState,
-    { authoritativeOnly = false } = {},
+    { authoritativeOnly = false, includeStatic = true } = {},
 ) {
     const routes = emptyFeatureCollection();
     const completedRoutes = emptyFeatureCollection();
@@ -82,11 +82,13 @@ export function buildMapCollections(
         if (!position) continue;
         const properties = routeProperties(flight);
 
-        routes.features.push({
-            type: "Feature",
-            geometry: route.geometry,
-            properties,
-        });
+        if (includeStatic) {
+            routes.features.push({
+                type: "Feature",
+                geometry: route.geometry,
+                properties,
+            });
+        }
         completedRoutes.features.push({
             type: "Feature",
             geometry: {

@@ -71,7 +71,7 @@ export function createNetworkMap(maplibregl, container, config, onTileError) {
 }
 
 export function waitForMapLoad(map) {
-    if (map.loaded()) return Promise.resolve();
+    if (map.isStyleLoaded()) return Promise.resolve();
     return new Promise((resolve, reject) => {
         const onLoad = () => {
             cleanup();
@@ -84,10 +84,10 @@ export function waitForMapLoad(map) {
             }
         };
         const cleanup = () => {
-            map.off("load", onLoad);
+            map.off("style.load", onLoad);
             map.off("error", onError);
         };
-        map.on("load", onLoad);
+        map.on("style.load", onLoad);
         map.on("error", onError);
     });
 }
@@ -252,12 +252,20 @@ export function prepareAirportLabels(map, featureCollection) {
     return { type: "FeatureCollection", features };
 }
 
-export function updateMapSources(map, data, airports, selectedRoute) {
-    map.getSource(SOURCE_IDS.airports)?.setData(airports);
-    map.getSource(SOURCE_IDS.routes)?.setData(data.routes);
+export function updateMapSources(
+    map,
+    data,
+    airports,
+    selectedRoute,
+    { staticSources = true } = {},
+) {
+    if (staticSources) {
+        map.getSource(SOURCE_IDS.airports)?.setData(airports);
+        map.getSource(SOURCE_IDS.routes)?.setData(data.routes);
+        map.getSource(SOURCE_IDS.selected)?.setData(selectedRoute);
+    }
     map.getSource(SOURCE_IDS.completedRoutes)?.setData(data.completedRoutes);
     map.getSource(SOURCE_IDS.aircraft)?.setData(data.aircraft);
-    map.getSource(SOURCE_IDS.selected)?.setData(selectedRoute);
 }
 
 export function setLayerVisibility(map, layerIds, visible) {
