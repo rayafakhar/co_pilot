@@ -1,0 +1,16 @@
+{% extends "tracker/base.html" %}
+
+{% block title %}Live network map · Northstar Operations{% endblock %}
+
+{% block content %}
+<section class="shell board-shell">
+    <div class="content-panel">
+        <p class="eyebrow">Live simulation</p>
+        <h1>Flight network map</h1>
+        <p>Map rendering is being initialized from the server-authoritative simulation feed.</p>
+        <noscript>
+            <p class="noscript-note">The interactive map requires JavaScript. The <a href="{% url 'tracker:flight_board' %}">flight board</a> remains available without it.</p>
+        </noscript>
+    </div>
+</section>
+{% endblock %}

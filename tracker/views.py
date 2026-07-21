@@ -12,8 +12,14 @@ from django.utils import timezone
 
 from .models import Aircraft, Airport, Flight, MaintenanceBlock
 from .services.analytics import aircraft_snapshot
-from .services.clock import get_simulation_time
+from .services.clock import (
+    ClockConfigurationError,
+    get_simulation_clock,
+    get_simulation_time,
+    simulation_time_for_clock,
+)
 from .services.distance import practical_range_km
+from .services.map_data import build_network_map_payload
 from .services.presentation import serialize_flight, utc_iso, utc_label
 
 BOARD_CANDIDATE_LIMIT = 1000
@@ -127,6 +133,49 @@ def flight_board_data(request):
             "html": html,
         }
     )
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+def network_map(request):
+    simulation_time, generated_at = _request_times()
+    return render(
+        request,
+        "tracker/network_map.html",
+        {
+            "simulation_time": utc_label(simulation_time),
+            "generated_at": utc_label(generated_at),
+        },
+    )
+
+
+def network_map_data(request):
+    """Return bounded, server-authoritative simulated network state."""
+    generated_at = timezone.now()
+    try:
+        clock = get_simulation_clock()
+        simulation_time = (
+            simulation_time_for_clock(clock, wall_time=generated_at)
+            if clock is not None
+            else generated_at
+        )
+        payload = build_network_map_payload(
+            simulation_time=simulation_time,
+            generated_at=generated_at,
+            clock=clock,
+        )
+    except ClockConfigurationError:
+        response = JsonResponse(
+            {
+                "schema_version": 1,
+                "error": "simulation_clock_invalid",
+                "message": "The simulation clock is unavailable.",
+                "generated_at": utc_iso(generated_at),
+            },
+            status=503,
+        )
+    else:
+        response = JsonResponse(payload)
     response["Cache-Control"] = "no-store"
     return response
 
