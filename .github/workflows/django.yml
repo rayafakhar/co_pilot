@@ -17,6 +17,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install and verify map assets
+        run: |
+          npm ci
+          npm run build
+          npm test
+          npm run check:generated
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -27,6 +37,17 @@ jobs:
         run: |
           python manage.py check
           python manage.py makemigrations --check
+      - name: Deterministic generation smoke test
+        run: |
+          python manage.py migrate
+          python manage.py generate_data \
+            --seed 20260719 \
+            --aircraft-count 3 \
+            --min-flights-per-aircraft 4 \
+            --max-flights-per-aircraft 4 \
+            --clear
+          python manage.py generate_data --validate-only
+          python manage.py simulation_clock --status
       - name: Test with coverage
         run: |
           coverage run manage.py test

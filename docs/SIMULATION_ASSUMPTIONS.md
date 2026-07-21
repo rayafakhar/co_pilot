@@ -44,3 +44,19 @@ Maintenance windows block the aircraft and push its readiness time.
 All database timestamps are aware UTC. Airport-local display uses IANA timezone data.
 The server instant is authoritative; a device clock is display-only. Journey progress
 is interpolation over effective block time and is not a geographic position.
+
+## Live map position
+
+The live map turns that estimated journey progress into a visual point along a Turf
+great-circle path. It assumes constant progress through the effective block-time
+window. It does not model winds, airway routing, holding, vectoring, climb and descent
+profiles, navigation fixes, or an aircraft's real movement.
+
+For a diversion, geometry ends at the recorded resulting airport rather than the
+planned destination. International-date-line routes may be split into multiple visual
+segments so they do not wrap incorrectly across the map.
+
+The Django simulation time remains authoritative. Browser animation only fills the
+visual interval between polling responses; pausing that animation does not pause the
+simulation, and a device clock never changes operational state. No displayed position
+represents GPS, ADS-B, radar, or airline operational data.

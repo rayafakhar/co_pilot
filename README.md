@@ -18,6 +18,9 @@ validated before data is committed.
 - One authoritative server-side flight lifecycle with exact boundary tests
 - UTC storage plus explicitly labelled UTC and airport-local display times
 - A filterable, responsive flight board refreshed from JSON every 20 seconds
+- A persistent, controllable simulation clock shared by every operational view
+- A responsive live network map rendered with MapLibre from a bounded Django feed
+- Great-circle routes, bearings, and schedule-derived interpolation powered by Turf
 - Aircraft pages with licensed model-specific photography, current state, technical data, and timelines
 - Flight detail pages comparing scheduled, estimated, and actual timing
 - Structured validation errors, atomic generation, and rollback on violations
@@ -130,10 +133,13 @@ Then install and run:
 python -m pip install -r requirements.txt
 python manage.py migrate
 python manage.py generate_data --seed 20260719 --clear
+python manage.py simulation_clock --status
 python manage.py runserver
 ~~~
 
-Open http://127.0.0.1:8000/.
+Open http://127.0.0.1:8000/ for the flight board or
+http://127.0.0.1:8000/network-map/ for the live simulation map. Built JavaScript
+and CSS bundles are committed, so normal Python demo use does not require Node.js.
 
 Configuration is optional for local development. Copy .env.example values into your
 environment when you need to change the secret, debug mode, or allowed hosts.
@@ -143,7 +149,14 @@ environment when you need to change the secret, debug mode, or allowed hosts.
 The recommended showcase command is:
 
 ~~~bash
-python manage.py generate_data +  --seed 20260719 +  --aircraft-count 12 +  --days-back 3 +  --days-forward 7 +  --min-flights-per-aircraft 4 +  --max-flights-per-aircraft 10 +  --clear
+python manage.py generate_data \
+  --seed 20260719 \
+  --aircraft-count 12 \
+  --days-back 3 \
+  --days-forward 7 \
+  --min-flights-per-aircraft 4 \
+  --max-flights-per-aircraft 10 \
+  --clear
 ~~~
 
 An eight-digit YYYYMMDD seed also determines the UTC-noon schedule anchor. Other
@@ -169,12 +182,39 @@ chosen random seed while placing the schedule on a specific date.
 Data is never deleted unless --clear is supplied. Generation and validation share
 one atomic transaction.
 
+## Simulation clock
+
+The singleton `SimulationClock` stores a deterministic schedule anchor, its matching
+wall-clock start, a speed multiplier, and pause state. Operational pages and JSON
+feeds read that shared clock instead of independently reading wall time. Generating
+with `--clear` resets the clock inside the same transaction; append generation leaves
+it intact. The clock can be inspected, paused, resumed, reset, or accelerated:
+
+~~~bash
+python manage.py simulation_clock --status
+python manage.py simulation_clock --pause
+python manage.py simulation_clock --resume
+python manage.py simulation_clock --speed 5
+python manage.py simulation_clock --reset
+~~~
+
+The map polls authoritative state every 15 seconds. Between responses, Turf
+interpolates a visual position along a great-circle route from effective departure,
+arrival, and simulation timestamps. MapLibre keeps persistent GeoJSON sources and
+layers rather than recreating the map. Pausing visual motion in the browser does not
+pause the server clock.
+
+Aircraft positions are interpolated from the deterministic schedule and authoritative
+simulation clock. They are not GPS, ADS-B, radar, or airline operational positions.
+
 ## Routes
 
 | Route | Purpose |
 | --- | --- |
 | / | Filterable operations board |
 | /board/data/ | Read-only polling JSON with server-rendered rows |
+| /network-map/ | Interactive simulated live network map |
+| /network-map/data/ | Bounded, no-store JSON snapshot for the map |
 | /aircraft/&lt;registration&gt;/ | Aircraft state, metrics, and timeline |
 | /flights/&lt;flight-number&gt;/ | Flight operation detail |
 | /admin/ | Validated operational data management |
@@ -190,11 +230,21 @@ coverage run manage.py test
 coverage report
 ruff check .
 ruff format --check .
+npm ci
+npm run build
+npm test
+npm run check:generated
 ~~~
 
 Coverage includes models, lifecycle boundaries, timezone equivalence, distance and
 duration, unsafe-schedule detection, deterministic generation across multiple seeds,
-command rollback, filters, JSON polling, query bounds, and detail pages.
+command rollback, simulation-clock transitions, filters, JSON polling, bounded map
+queries, detail pages, great-circle geometry, client reconciliation, reduced-motion
+behavior, and persistent MapLibre source updates.
+
+Node.js is needed only when maintaining or verifying map assets. `npm run build`
+bundles the pinned MapLibre and modular Turf dependencies with esbuild; the generated
+files in `tracker/static/tracker/dist/` must be committed with source changes.
 
 ## Project structure
 
@@ -217,6 +267,11 @@ tracker/
 docs/                            Baseline, assumptions, attribution, screenshots
 ~~~
 
+Map-specific additions include `tracker/services/clock.py`,
+`tracker/services/map_data.py`, the `tracker/assets/network-map/` source and Vitest
+suite, committed output in `tracker/static/tracker/dist/`, and
+`docs/LIVE_MAP_ARCHITECTURE.md`.
+
 ## Simulation assumptions and limitations
 
 This is an understandable operations simulation, not certified dispatch software.
@@ -226,7 +281,8 @@ airspace restrictions, payload-range trade-offs, slot controls, and crew legalit
 Progress is time interpolation, not ADS-B.
 
 See [simulation assumptions](docs/SIMULATION_ASSUMPTIONS.md) and
-[image attribution](docs/IMAGE_ATTRIBUTIONS.md) for detail.
+[live map architecture](docs/LIVE_MAP_ARCHITECTURE.md) for technical detail, and
+[image attribution](docs/IMAGE_ATTRIBUTIONS.md) for media sources.
 
 ## Roadmap
 
