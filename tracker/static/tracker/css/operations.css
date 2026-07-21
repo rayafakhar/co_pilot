@@ -101,6 +101,7 @@ h1, h2, h3 { font-family: var(--display); }
 }
 .board-hero h1 span { color: var(--sky); }
 .hero-copy { max-width: 670px; margin: 28px 0 0; color: var(--muted); font-size: 1.05rem; }
+.hero-actions { margin: 22px 0 0; }
 .runway-visual {
     position: relative; align-self: stretch; min-height: 300px; display: flex;
     align-items: flex-end; justify-content: center; padding: 42px; isolation: isolate;

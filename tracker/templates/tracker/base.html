@@ -9,7 +9,9 @@
     <title>{% block title %}Northstar Operations{% endblock %}</title>
     <link rel="icon" href="{% static 'tracker/images/aircraft-silhouette.svg' %}" type="image/svg+xml">
     <link rel="stylesheet" href="{% static 'tracker/css/operations.css' %}">
+    {% block extra_styles %}{% endblock %}
     <script src="{% static 'tracker/js/operations.js' %}" defer></script>
+    {% block extra_scripts %}{% endblock %}
 </head>
 <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -26,6 +28,7 @@
             </a>
             <nav class="primary-nav" aria-label="Primary navigation">
                 <a href="{% url 'tracker:flight_board' %}">Flight board</a>
+                <a href="{% url 'tracker:network_map' %}">Live network map</a>
                 <a href="{% url 'admin:index' %}">Admin</a>
             </nav>
             <div class="clock-cluster">

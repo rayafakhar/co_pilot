@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from django.db import connection
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
@@ -203,7 +203,12 @@ class NetworkMapDataTests(TestCase):
             },
         )
 
-    def test_map_page_is_available_before_client_bundle(self):
+    @override_settings(
+        MAP_TILE_URL="https://tiles.example.test/{z}/{x}/{y}.png",
+        MAP_TILE_ATTRIBUTION="Example public tiles",
+        SECRET_KEY="must-not-appear-in-map-config",
+    )
+    def test_map_page_renders_public_config_bundles_navigation_and_fallback(self):
         with (
             patch("tracker.views.timezone.now", return_value=WALL_TIME),
             patch("tracker.views.get_simulation_time", return_value=SIMULATION_TIME),
@@ -211,4 +216,12 @@ class NetworkMapDataTests(TestCase):
             response = self.client.get(reverse("tracker:network_map"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Live simulation")
+        self.assertContains(response, "/static/tracker/dist/network-map.css")
+        self.assertContains(response, "/static/tracker/dist/network-map.js")
+        self.assertContains(response, "https://tiles.example.test/{z}/{x}/{y}.png")
+        self.assertContains(response, "Example public tiles")
+        self.assertContains(response, "/static/tracker/images/aircraft-map-icon.svg")
+        self.assertContains(response, "<noscript>", html=False)
+        self.assertContains(response, "Live network map")
         self.assertContains(response, reverse("tracker:flight_board"))
+        self.assertNotContains(response, "must-not-appear-in-map-config")

@@ -42,6 +42,40 @@ export function createFlightState() {
     };
 }
 
+export function shouldAnimate({
+    hidden = false,
+    reducedMotion = false,
+    clientPaused = false,
+    serverPaused = false,
+    hasFlights = false,
+} = {}) {
+    return (
+        hasFlights &&
+        !hidden &&
+        !reducedMotion &&
+        !clientPaused &&
+        !serverPaused
+    );
+}
+
+export function reconcileSelection(selectedFlightNumber, flights) {
+    return selectedFlightNumber && flights.has(selectedFlightNumber)
+        ? selectedFlightNumber
+        : null;
+}
+
+export function correctedProgress(
+    currentProgress,
+    authoritativeProgress,
+    { snapThreshold = 0.12, easing = 0.18 } = {},
+) {
+    const target = Math.max(0, Math.min(1, Number(authoritativeProgress) || 0));
+    if (!Number.isFinite(currentProgress)) return target;
+    const difference = target - currentProgress;
+    if (Math.abs(difference) >= snapThreshold) return target;
+    return Math.max(0, Math.min(1, currentProgress + difference * easing));
+}
+
 export function reconcileFlightState(currentState, payload, sequence) {
     const generatedAt = Date.parse(payload?.generated_at);
     if (
@@ -55,11 +89,18 @@ export function reconcileFlightState(currentState, payload, sequence) {
     const nextFlights = new Map();
     const added = [];
     const routeChanged = [];
+    let skipped = 0;
     for (const flight of payload.flights ?? []) {
-        if (!flight?.flight_number) continue;
+        if (!flight?.flight_number) {
+            skipped += 1;
+            continue;
+        }
         const previous = currentState.flights.get(flight.flight_number);
         const nextRouteKey = routeKey(flight);
-        if (!nextRouteKey) continue;
+        if (!nextRouteKey) {
+            skipped += 1;
+            continue;
+        }
         if (!previous) added.push(flight.flight_number);
         if (previous && previous.routeKey !== nextRouteKey) {
             routeChanged.push(flight.flight_number);
@@ -80,5 +121,6 @@ export function reconcileFlightState(currentState, payload, sequence) {
         added,
         removed,
         routeChanged,
+        skipped,
     };
 }

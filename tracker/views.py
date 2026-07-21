@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from django.conf import settings
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string
+from django.templatetags.static import static
+from django.urls import reverse
 from django.utils import timezone
 
 from .models import Aircraft, Airport, Flight, MaintenanceBlock
@@ -145,6 +148,13 @@ def network_map(request):
         {
             "simulation_time": utc_label(simulation_time),
             "generated_at": utc_label(generated_at),
+            "map_config": {
+                "dataUrl": reverse("tracker:network_map_data"),
+                "tileUrl": settings.MAP_TILE_URL,
+                "tileAttribution": settings.MAP_TILE_ATTRIBUTION,
+                "aircraftIconUrl": static("tracker/images/aircraft-map-icon.svg"),
+                "flightBoardUrl": reverse("tracker:flight_board"),
+            },
         },
     )
 

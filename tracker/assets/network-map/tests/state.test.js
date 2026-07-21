@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    correctedProgress,
     createFlightState,
     progressAtTime,
     reconcileFlightState,
+    reconcileSelection,
+    shouldAnimate,
     simulationTimeAt,
 } from "../state.js";
 
@@ -83,5 +86,56 @@ describe("simulation state", () => {
             3,
         );
         expect(removed.removed).toEqual(["TS100"]);
+    });
+
+    it("preserves selection only while the stable flight identity exists", () => {
+        const state = reconcileFlightState(
+            createFlightState(),
+            { generated_at: "2026-07-19T10:00:10Z", flights: [baseFlight] },
+            1,
+        );
+        expect(reconcileSelection("TS100", state.flights)).toBe("TS100");
+        expect(reconcileSelection("MISSING", state.flights)).toBeNull();
+    });
+
+    it("eases small corrections and snaps significant authoritative changes", () => {
+        expect(correctedProgress(0.5, 0.55)).toBeCloseTo(0.509);
+        expect(correctedProgress(0.2, 0.8)).toBe(0.8);
+        expect(correctedProgress(undefined, 0.4)).toBe(0.4);
+    });
+
+    it("disables animation for reduced motion, hidden pages, and client pause", () => {
+        const active = { hasFlights: true };
+        expect(shouldAnimate(active)).toBe(true);
+        expect(shouldAnimate({ ...active, reducedMotion: true })).toBe(false);
+        expect(shouldAnimate({ ...active, hidden: true })).toBe(false);
+        expect(shouldAnimate({ ...active, clientPaused: true })).toBe(false);
+        expect(shouldAnimate({ ...active, serverPaused: true })).toBe(false);
+    });
+
+    it("keeps server time advancing when only client visual motion is paused", () => {
+        const serverTime = simulationTimeAt(
+            "2026-07-19T10:00:00Z",
+            2,
+            1_000,
+            6_000,
+            false,
+        );
+        expect(serverTime).toBe(Date.parse("2026-07-19T10:00:10Z"));
+        expect(shouldAnimate({ hasFlights: true, clientPaused: true })).toBe(false);
+    });
+
+    it("skips one malformed flight without dropping valid state", () => {
+        const state = reconcileFlightState(
+            createFlightState(),
+            {
+                generated_at: "2026-07-19T10:00:10Z",
+                flights: [{ flight_number: "BROKEN" }, baseFlight],
+            },
+            1,
+        );
+        expect(state.accepted).toBe(true);
+        expect(state.skipped).toBe(1);
+        expect([...state.flights.keys()]).toEqual(["TS100"]);
     });
 });

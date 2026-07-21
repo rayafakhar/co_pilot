@@ -1,16 +1,133 @@
 {% extends "tracker/base.html" %}
+{% load static %}
 
 {% block title %}Live network map · Northstar Operations{% endblock %}
 
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'tracker/dist/network-map.css' %}">
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'tracker/dist/network-map.js' %}" defer></script>
+{% endblock %}
+
 {% block content %}
-<section class="shell board-shell">
-    <div class="content-panel">
-        <p class="eyebrow">Live simulation</p>
-        <h1>Flight network map</h1>
-        <p>Map rendering is being initialized from the server-authoritative simulation feed.</p>
-        <noscript>
-            <p class="noscript-note">The interactive map requires JavaScript. The <a href="{% url 'tracker:flight_board' %}">flight board</a> remains available without it.</p>
-        </noscript>
+{{ map_config|json_script:"network-map-config" }}
+<section class="network-map-page" data-network-map>
+    <header class="map-brief shell">
+        <div>
+            <p class="eyebrow">Live simulation · network control</p>
+            <h1>Network,<br><span>in motion.</span></h1>
+        </div>
+        <div class="map-brief-copy">
+            <p>Aircraft positions are schedule-based estimates driven by the server simulation clock. This is not GPS, ADS-B, radar, or airline operational data.</p>
+            <div class="map-feed-state" data-feed-state aria-live="polite">
+                <span class="live-dot" aria-hidden="true"></span>
+                <span data-feed-message>Connecting to the simulation feed</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="map-telemetry shell" aria-label="Live simulation summary">
+        <article><span>Airborne</span><strong data-map-summary="active_flights">—</strong></article>
+        <article><span>Delayed</span><strong class="amber" data-map-summary="delayed_flights">—</strong></article>
+        <article><span>Diverted</span><strong class="red" data-map-summary="diverted_flights">—</strong></article>
+        <article><span>Airports</span><strong data-map-summary="airports">—</strong></article>
+        <article class="map-clock-readout">
+            <span>Authoritative simulation time</span>
+            <time data-map-simulation-time>{{ simulation_time }}</time>
+        </article>
     </div>
+
+    <div class="map-workspace shell">
+        <section class="map-stage" aria-labelledby="map-stage-title">
+            <h2 id="map-stage-title" class="sr-only">Active simulated flight map</h2>
+            <div id="flight-network-map" class="flight-network-map" aria-label="Interactive map of simulated active flights"></div>
+
+            <div class="map-stage-state" data-map-loading>
+                <span class="map-loader" aria-hidden="true"></span>
+                <strong>Loading network geometry</strong>
+                <span>Requesting the latest authoritative simulation state.</span>
+            </div>
+            <div class="map-stage-state" data-map-empty hidden>
+                <strong>No aircraft are airborne</strong>
+                <span>The map will update when a simulated movement departs.</span>
+                <a href="{% url 'tracker:flight_board' %}">Review the flight board</a>
+            </div>
+            <div class="map-stage-state map-stage-state--error" data-map-fatal hidden>
+                <strong>Map rendering is unavailable</strong>
+                <span>Flight data and detail links remain available in the control panel.</span>
+            </div>
+
+            <div class="map-control-deck" aria-label="Map controls">
+                <button type="button" data-map-action="fit">Fit active network</button>
+                <button type="button" data-map-action="labels" aria-pressed="true">Airport labels</button>
+                <button type="button" data-map-action="routes" aria-pressed="true">Route lines</button>
+                <button type="button" data-map-action="pause" aria-pressed="false">Pause visual motion</button>
+                <button type="button" data-map-action="refresh">Refresh now</button>
+            </div>
+
+            <div class="map-warning map-warning--data" data-map-data-error hidden role="status">
+                The flight feed is temporarily unavailable. Last valid positions are marked stale.
+            </div>
+            <div class="map-warning map-warning--tiles" data-map-tile-error hidden role="status">
+                Basemap tiles are unavailable. Flight routes and detail links remain usable.
+            </div>
+        </section>
+
+        <aside class="flight-console" aria-labelledby="flight-console-title">
+            <header>
+                <div>
+                    <p class="eyebrow">Selection console</p>
+                    <h2 id="flight-console-title">Active flights</h2>
+                </div>
+                <button type="button" class="console-clear" data-map-action="clear" disabled>Clear selection</button>
+            </header>
+
+            <div class="selected-flight selected-flight--empty" data-selected-empty>
+                <span class="selection-crosshair" aria-hidden="true"></span>
+                <strong>Select an aircraft or route</strong>
+                <p>Choose a moving flight on the map or from the keyboard-accessible list.</p>
+            </div>
+
+            <article class="selected-flight" data-selected-panel hidden>
+                <div class="selected-flight-heading">
+                    <div>
+                        <span data-selected-status></span>
+                        <h3 data-selected-flight-number></h3>
+                    </div>
+                    <strong data-selected-progress></strong>
+                </div>
+                <dl class="selected-flight-data">
+                    <div><dt>Aircraft</dt><dd data-selected-aircraft></dd></div>
+                    <div><dt>Origin</dt><dd data-selected-origin></dd></div>
+                    <div><dt>Planned destination</dt><dd data-selected-planned></dd></div>
+                    <div data-selected-result-row><dt>Result destination</dt><dd data-selected-result></dd></div>
+                    <div><dt>Delay</dt><dd data-selected-delay></dd></div>
+                    <div><dt>Effective departure</dt><dd data-selected-departure></dd></div>
+                    <div><dt>Effective arrival</dt><dd data-selected-arrival></dd></div>
+                    <div><dt>Simulation timestamp</dt><dd data-selected-simulation></dd></div>
+                </dl>
+                <div class="selected-flight-links">
+                    <a data-selected-flight-url href="#">Flight detail</a>
+                    <a data-selected-aircraft-url href="#">Aircraft detail</a>
+                </div>
+            </article>
+
+            <div class="active-flight-list-wrap">
+                <p class="list-label">Keyboard flight index</p>
+                <ul class="active-flight-list" data-active-flight-list>
+                    <li class="active-flight-list-empty">Waiting for active movements.</li>
+                </ul>
+            </div>
+        </aside>
+    </div>
+
+    <noscript>
+        <div class="shell map-noscript">
+            <strong>The interactive live simulation requires JavaScript.</strong>
+            <a href="{% url 'tracker:flight_board' %}">Open the server-rendered flight board</a>
+        </div>
+    </noscript>
 </section>
 {% endblock %}
