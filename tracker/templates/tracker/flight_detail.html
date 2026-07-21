@@ -71,7 +71,7 @@
         {% if flight.cancelled_reason %}<div class="notice notice--danger"><strong>Cancellation</strong><p>{{ flight.cancelled_reason }}</p></div>{% endif %}
         {% if row.diverted %}<div class="notice notice--warning"><strong>Diversion</strong><p>The simulated aircraft chain continues from {{ row.result_code }}.</p></div>{% endif %}
         {% if flight.notes %}<div class="notice"><strong>Operational note</strong><p>{{ flight.notes }}</p></div>{% endif %}
-        <p class="fine-print">Status calculated at {{ generated_at }} by the server.</p>
+        <p class="fine-print">Status calculated at simulation time {{ simulation_time }} by the server.</p>
     </aside>
 </div>
 {% endblock %}

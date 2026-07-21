@@ -30,8 +30,8 @@
             </nav>
             <div class="clock-cluster">
                 <div>
-                    <span class="instrument-label">UTC · server authority</span>
-                    <time class="instrument-value" data-server-time>{{ generated_at|default:"Awaiting data" }}</time>
+                    <span class="instrument-label">Simulation time · UTC</span>
+                    <time class="instrument-value" data-server-time>{{ simulation_time|default:"Awaiting data" }}</time>
                 </div>
                 <div>
                     <span class="instrument-label">Your device time</span>

@@ -32,13 +32,16 @@ class OperationsViewTests(TestCase):
         )
 
     def request_at_anchor(self, url):
-        with patch("tracker.views.timezone.now", return_value=ANCHOR):
+        with (
+            patch("tracker.views.timezone.now", return_value=ANCHOR),
+            patch("tracker.views.get_simulation_time", return_value=ANCHOR),
+        ):
             return self.client.get(url)
 
     def test_board_renders_timezone_labels_and_accessible_fallback(self):
         response = self.request_at_anchor(reverse("tracker:flight_board"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "UTC · server authority")
+        self.assertContains(response, "Simulation time · UTC")
         self.assertContains(response, "Your device time")
         self.assertContains(response, "<caption", html=False)
         self.assertContains(response, "<noscript>", html=False)
@@ -60,13 +63,17 @@ class OperationsViewTests(TestCase):
 
     def test_json_endpoint_uses_server_status_and_one_flight_query(self):
         url = reverse("tracker:flight_board_data")
-        with patch("tracker.views.timezone.now", return_value=ANCHOR):
+        with (
+            patch("tracker.views.timezone.now", return_value=ANCHOR),
+            patch("tracker.views.get_simulation_time", return_value=ANCHOR),
+        ):
             with self.assertNumQueries(1):
                 response = self.client.get(url)
         payload = response.json()
         self.assertEqual(response.status_code, 200)
         self.assertIn("html", payload)
         self.assertIn("generated_at", payload)
+        self.assertEqual(payload["simulation_time"], utc_iso(ANCHOR))
         self.assertTrue(payload["flights"])
         self.assertNotIn("id", payload["flights"][0])
         item = Flight.objects.get(flight_number=payload["flights"][0]["flight_number"])
@@ -157,6 +164,7 @@ class OperationsViewTests(TestCase):
 
         with (
             patch("tracker.views.timezone.now", return_value=ANCHOR),
+            patch("tracker.views.get_simulation_time", return_value=ANCHOR),
             patch("tracker.views.BOARD_CANDIDATE_LIMIT", 2),
             patch("tracker.views.BOARD_LIMIT", 1),
         ):
@@ -169,7 +177,10 @@ class OperationsViewTests(TestCase):
         )
 
     def test_board_queries_are_bounded(self):
-        with patch("tracker.views.timezone.now", return_value=ANCHOR):
+        with (
+            patch("tracker.views.timezone.now", return_value=ANCHOR),
+            patch("tracker.views.get_simulation_time", return_value=ANCHOR),
+        ):
             with CaptureQueriesContext(connection) as queries:
                 response = self.client.get(reverse("tracker:flight_board"))
                 self.assertEqual(response.status_code, 200)
@@ -189,7 +200,7 @@ class OperationsViewTests(TestCase):
         self.assertContains(response, item.aircraft_type.image_author)
         self.assertContains(response, item.aircraft_type.image_license)
         self.assertContains(response, item.aircraft_type.image_source_url)
-        self.assertLessEqual(len(queries), 3)
+        self.assertLessEqual(len(queries), 4)
         missing = self.client.get(reverse("tracker:aircraft_detail", args=["MISSING"]))
         self.assertEqual(missing.status_code, 404)
 

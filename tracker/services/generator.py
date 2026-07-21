@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from tracker.models import Aircraft, AircraftType, Airport, Flight, MaintenanceBlock
 
+from .clock import initialize_simulation_clock, reset_simulation_clock
 from .distance import calculate_duration, haversine_distance_km, practical_range_km
 from .fixtures import load_reference_data
 from .status import get_flight_status
@@ -360,6 +361,15 @@ def generate_schedule(config: GenerationConfig) -> GenerationReport:
         raise ScheduleGenerationError(violations)
     Flight.objects.bulk_create(all_flights, batch_size=250)
     MaintenanceBlock.objects.bulk_create(all_blocks, batch_size=100)
+    clock_arguments = {
+        "seed": config.seed,
+        "schedule_anchor": anchor,
+        "wall_time": timezone.now(),
+    }
+    if config.clear:
+        reset_simulation_clock(**clock_arguments)
+    else:
+        initialize_simulation_clock(**clock_arguments)
 
     report = GenerationReport(
         seed=config.seed,

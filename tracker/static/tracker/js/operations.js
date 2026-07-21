@@ -65,8 +65,8 @@
                 if (target) target.textContent = value;
             });
             document.querySelectorAll("[data-server-time]").forEach((target) => {
-                target.textContent = payload.generated_at_label;
-                target.dateTime = payload.generated_at;
+                target.textContent = payload.simulation_time_label;
+                target.dateTime = payload.simulation_time;
             });
             refreshState.textContent = `Updated ${payload.generated_at_label}`;
             refreshState.parentElement.classList.remove("is-error");

@@ -12,11 +12,17 @@ from django.utils import timezone
 
 from .models import Aircraft, Airport, Flight, MaintenanceBlock
 from .services.analytics import aircraft_snapshot
+from .services.clock import get_simulation_time
 from .services.distance import practical_range_km
 from .services.presentation import serialize_flight, utc_iso, utc_label
 
 BOARD_CANDIDATE_LIMIT = 1000
 BOARD_LIMIT = 250
+
+
+def _request_times():
+    generated_at = timezone.now()
+    return get_simulation_time(wall_time=generated_at), generated_at
 
 
 def _board_rows(request, at_time):
@@ -88,13 +94,15 @@ def _summary(rows):
 
 
 def flight_board(request):
-    at_time = timezone.now()
+    at_time, generated_at = _request_times()
     rows = _board_rows(request, at_time)
     context = {
         "rows": rows,
         "summary": _summary(rows),
-        "generated_at": utc_label(at_time),
-        "generated_at_iso": utc_iso(at_time),
+        "simulation_time": utc_label(at_time),
+        "simulation_time_iso": utc_iso(at_time),
+        "generated_at": utc_label(generated_at),
+        "generated_at_iso": utc_iso(generated_at),
         "aircraft_options": Aircraft.objects.filter(active=True).only("registration"),
         "airport_options": Airport.objects.exclude(iata_code=None).only("iata_code", "city"),
         "status_options": Flight.Status.choices,
@@ -105,13 +113,15 @@ def flight_board(request):
 
 def flight_board_data(request):
     """Return server-authored rows; browser time never determines flight state."""
-    at_time = timezone.now()
+    at_time, generated_at = _request_times()
     rows = _board_rows(request, at_time)
     html = render_to_string("tracker/partials/flight_rows.html", {"rows": rows})
     response = JsonResponse(
         {
-            "generated_at": utc_iso(at_time),
-            "generated_at_label": utc_label(at_time),
+            "simulation_time": utc_iso(at_time),
+            "simulation_time_label": utc_label(at_time),
+            "generated_at": utc_iso(generated_at),
+            "generated_at_label": utc_label(generated_at),
             "summary": _summary(rows),
             "flights": rows,
             "html": html,
@@ -135,7 +145,7 @@ def aircraft_detail(request, registration):
         ).order_by("scheduled_departure")
     )
     blocks = list(MaintenanceBlock.objects.filter(aircraft=aircraft).order_by("starts_at"))
-    at_time = timezone.now()
+    at_time, generated_at = _request_times()
     return render(
         request,
         "tracker/aircraft_detail.html",
@@ -143,7 +153,8 @@ def aircraft_detail(request, registration):
             "aircraft": aircraft,
             "snapshot": aircraft_snapshot(aircraft, flights, blocks, at_time),
             "practical_range_km": round(practical_range_km(aircraft.aircraft_type)),
-            "generated_at": utc_label(at_time),
+            "simulation_time": utc_label(at_time),
+            "generated_at": utc_label(generated_at),
         },
     )
 
@@ -158,13 +169,14 @@ def flight_detail(request, flight_number):
         ),
         flight_number__iexact=flight_number,
     )
-    at_time = timezone.now()
+    at_time, generated_at = _request_times()
     return render(
         request,
         "tracker/flight_detail.html",
         {
             "flight": flight,
             "row": serialize_flight(flight, at_time),
-            "generated_at": utc_label(at_time),
+            "simulation_time": utc_label(at_time),
+            "generated_at": utc_label(generated_at),
         },
     )

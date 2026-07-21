@@ -2,12 +2,49 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import F, Q
 
 from .validators import validate_iana_timezone, validate_iata_code, validate_icao_code
+
+
+class SimulationClock(models.Model):
+    """Singleton configuration for server-authoritative simulation time."""
+
+    seed = models.BigIntegerField()
+    schedule_anchor = models.DateTimeField()
+    wall_clock_started_at = models.DateTimeField()
+    speed_multiplier = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("1.00"),
+    )
+    paused = models.BooleanField(default=False)
+    paused_simulation_time = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(speed_multiplier__gt=0),
+                name="simulation_clock_speed_positive",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(paused=True, paused_simulation_time__isnull=False)
+                    | Q(paused=False, paused_simulation_time__isnull=True)
+                ),
+                name="simulation_clock_pause_state_consistent",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        state = "paused" if self.paused else "running"
+        return f"Simulation clock ({state} at {self.speed_multiplier}x)"
 
 
 class Airport(models.Model):
