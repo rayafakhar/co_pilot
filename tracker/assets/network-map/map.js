@@ -18,32 +18,101 @@ export const LAYER_IDS = {
     aircraftIcon: "aircraft-icons",
 };
 
-export function createNetworkMap(maplibregl, container, config, onTileError) {
+export const BASEMAP_SOURCE_ID = "basemap";
+export const BASEMAP_LAYER_ID = "basemap";
+
+const BASEMAP_OPACITY = 0.78;
+
+function basemapSource(config) {
+    return {
+        type: "raster",
+        tiles: [config.tileUrl],
+        tileSize: 256,
+        attribution: config.tileAttribution,
+    };
+}
+
+function basemapLayer({ loading = false } = {}) {
+    return {
+        id: BASEMAP_LAYER_ID,
+        type: "raster",
+        source: BASEMAP_SOURCE_ID,
+        paint: {
+            "raster-saturation": -0.85,
+            "raster-contrast": 0.34,
+            "raster-brightness-min": 0.04,
+            "raster-brightness-max": 0.4,
+            "raster-opacity": loading ? 0 : BASEMAP_OPACITY,
+        },
+    };
+}
+
+function fallbackGrid() {
+    const features = [];
+    for (let longitude = -180; longitude <= 180; longitude += 30) {
+        features.push({
+            type: "Feature",
+            properties: {},
+            geometry: {
+                type: "LineString",
+                coordinates: [
+                    [longitude, -80],
+                    [longitude, 80],
+                ],
+            },
+        });
+    }
+    for (let latitude = -60; latitude <= 80; latitude += 20) {
+        features.push({
+            type: "Feature",
+            properties: {},
+            geometry: {
+                type: "LineString",
+                coordinates: [
+                    [-180, latitude],
+                    [180, latitude],
+                ],
+            },
+        });
+    }
+    return { type: "FeatureCollection", features };
+}
+
+export function createNetworkMap(
+    maplibregl,
+    container,
+    config,
+    onTileError,
+    onTileReady,
+) {
     const map = new maplibregl.Map({
         container,
         style: {
             version: 8,
             sources: {
-                basemap: {
-                    type: "raster",
-                    tiles: [config.tileUrl],
-                    tileSize: 256,
-                    attribution: config.tileAttribution,
+                "fallback-grid": {
+                    type: "geojson",
+                    data: fallbackGrid(),
                 },
+                [BASEMAP_SOURCE_ID]: basemapSource(config),
             },
             layers: [
                 {
-                    id: "basemap",
-                    type: "raster",
-                    source: "basemap",
+                    id: "fallback-background",
+                    type: "background",
+                    paint: { "background-color": "#061019" },
+                },
+                {
+                    id: "fallback-grid",
+                    type: "line",
+                    source: "fallback-grid",
                     paint: {
-                        "raster-saturation": -0.85,
-                        "raster-contrast": 0.34,
-                        "raster-brightness-min": 0.04,
-                        "raster-brightness-max": 0.4,
-                        "raster-opacity": 0.78,
+                        "line-color": "rgba(83,199,237,0.16)",
+                        "line-width": 1,
+                        "line-dasharray": [2, 3],
                     },
                 },
+                basemapLayer(),
             ],
         },
         center: [0, 24],
@@ -63,11 +132,51 @@ export function createNetworkMap(maplibregl, container, config, onTileError) {
     );
     map.on("error", (event) => {
         const message = String(event?.error?.message ?? "");
-        if (event?.sourceId === "basemap" || /tile|raster|source/i.test(message)) {
+        if (
+            event?.sourceId === BASEMAP_SOURCE_ID ||
+            /tile|raster/i.test(message)
+        ) {
             onTileError?.();
         }
     });
+    map.on("sourcedata", (event) => {
+        if (
+            event?.sourceId === BASEMAP_SOURCE_ID &&
+            event?.tile?.texture
+        ) {
+            onTileReady?.();
+        }
+    });
     return map;
+}
+
+export function setBasemapVisible(map, visible) {
+    if (!map?.getLayer?.(BASEMAP_LAYER_ID)) return false;
+    map.setPaintProperty(
+        BASEMAP_LAYER_ID,
+        "raster-opacity",
+        visible ? BASEMAP_OPACITY : 0,
+    );
+    return true;
+}
+
+export function reloadBasemap(map, config) {
+    if (
+        !map?.getSource?.(BASEMAP_SOURCE_ID) ||
+        !map?.getLayer?.(BASEMAP_LAYER_ID) ||
+        !config?.tileUrl
+    ) {
+        return false;
+    }
+    setBasemapVisible(map, false);
+    map.removeLayer(BASEMAP_LAYER_ID);
+    map.removeSource(BASEMAP_SOURCE_ID);
+    map.addSource(BASEMAP_SOURCE_ID, basemapSource(config));
+    const firstOperationalLayer = map.getLayer(LAYER_IDS.routes)
+        ? LAYER_IDS.routes
+        : undefined;
+    map.addLayer(basemapLayer({ loading: true }), firstOperationalLayer);
+    return true;
 }
 
 export function waitForMapLoad(map, { timeoutMs = 6_000 } = {}) {

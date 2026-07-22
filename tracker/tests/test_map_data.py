@@ -235,6 +235,7 @@ class NetworkMapDataTests(TestCase):
         self.assertContains(response, "Map bundle unavailable")
         self.assertContains(response, "Open the flight board")
         self.assertContains(response, "Retry map renderer")
+        self.assertContains(response, "Retry basemap")
         self.assertContains(response, "https://tiles.example.test/{z}/{x}/{y}.png")
         self.assertContains(response, "Example public tiles")
         self.assertContains(response, "/static/tracker/images/aircraft-map-icon.svg")

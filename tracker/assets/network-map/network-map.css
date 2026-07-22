@@ -229,7 +229,30 @@
 }
 .map-warning[hidden] { display: none; }
 .map-warning--data { border-color: #70582a; color: var(--amber); background: rgba(31, 24, 10, 0.92); }
-.map-warning--tiles { bottom: 88px; border-color: #743c3a; color: var(--red); background: rgba(35, 13, 16, 0.92); }
+.map-warning--tiles {
+    bottom: 88px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    border-color: #743c3a;
+    color: var(--red);
+    background: rgba(35, 13, 16, 0.92);
+}
+.map-warning--tiles button {
+    flex: 0 0 auto;
+    min-height: 36px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    padding: 0 10px;
+    color: inherit;
+    background: rgba(7, 16, 25, 0.78);
+    cursor: pointer;
+    font: 700 0.58rem var(--display);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.map-warning--tiles button:hover { color: var(--ink); }
 
 .flight-console {
     min-width: 0;
@@ -408,6 +431,7 @@
     .map-control-deck { top: 10px; left: 10px; right: 10px; gap: 5px; }
     .map-control-deck button { min-height: 44px; padding-inline: 9px; font-size: 0.57rem; }
     .map-warning { left: 10px; right: 10px; }
+    .map-warning--tiles { align-items: flex-start; flex-direction: column; }
     .flight-console > header,
     .selected-flight { padding-inline: 16px; }
     .flight-index-select { padding-inline: 16px; }

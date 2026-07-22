@@ -9,6 +9,8 @@ import {
     installOperationalLayers,
     LAYER_IDS,
     prepareAirportLabels,
+    reloadBasemap,
+    setBasemapVisible,
     setLayerVisibility,
     updateMapSources,
     waitForMapLoad,
@@ -31,6 +33,7 @@ import {
 
 const root = document.querySelector("[data-network-map]");
 const MAP_INITIALIZATION_RETRY_DELAYS = [750, 2_000];
+const TILE_RETRY_DELAYS = [1_500, 5_000, 15_000];
 
 if (root) {
     document.documentElement.classList.add("map-bundle-loaded");
@@ -85,6 +88,8 @@ if (root) {
     let mapInitializationFailures = 0;
     let mapRetryTimer = null;
     let tileError = false;
+    let tileRetryAttempts = 0;
+    let tileRetryTimer = null;
     let dataError = false;
     let requestController = null;
     let requestSequence = 0;
@@ -471,7 +476,57 @@ if (root) {
         }
     }
 
+    function clearTileRetry({ resetAttempts = false } = {}) {
+        if (tileRetryTimer !== null) window.clearTimeout(tileRetryTimer);
+        tileRetryTimer = null;
+        if (resetAttempts) tileRetryAttempts = 0;
+    }
+
+    function markTilesReady() {
+        tileError = false;
+        clearTileRetry({ resetAttempts: true });
+        setBasemapVisible(map, true);
+        renderUiState();
+    }
+
+    function scheduleTileRetry() {
+        if (
+            tileRetryTimer !== null ||
+            tileRetryAttempts >= TILE_RETRY_DELAYS.length
+        ) {
+            return;
+        }
+        const delay = TILE_RETRY_DELAYS[tileRetryAttempts];
+        tileRetryTimer = window.setTimeout(() => {
+            tileRetryTimer = null;
+            if (!mapReady || !reloadBasemap(map, config)) {
+                scheduleTileRetry();
+                return;
+            }
+            tileRetryAttempts += 1;
+        }, delay);
+    }
+
+    function markTileError() {
+        tileError = true;
+        setBasemapVisible(map, false);
+        renderUiState();
+        if (mapReady) scheduleTileRetry();
+    }
+
+    function retryTiles() {
+        clearTileRetry({ resetAttempts: true });
+        tileError = true;
+        renderUiState();
+        if (mapReady && reloadBasemap(map, config)) {
+            tileRetryAttempts = 1;
+        } else {
+            scheduleTileRetry();
+        }
+    }
+
     function discardMap() {
+        clearTileRetry({ resetAttempts: true });
         mapReady = false;
         root.classList.remove("is-map-ready");
         try {
@@ -502,16 +557,20 @@ if (root) {
         renderUiState({ loading: true });
         if (manual) setFeedMessage("Retrying map renderer");
         try {
-            map = createNetworkMap(maplibregl, dom.map, config, () => {
-                tileError = true;
-                renderUiState();
-            });
+            map = createNetworkMap(
+                maplibregl,
+                dom.map,
+                config,
+                markTileError,
+                markTilesReady,
+            );
             await waitForMapLoad(map);
             await installOperationalLayers(map, config.aircraftIconUrl);
             mapReady = true;
             mapInitializationFailures = 0;
             root.classList.add("is-map-ready");
             renderUiState();
+            if (tileError) scheduleTileRetry();
             bindMapSelection();
             if (latestPayload) {
                 airportsForMap = prepareAirportLabels(map, latestPayload.airports);
@@ -590,6 +649,8 @@ if (root) {
             refreshNetwork();
         } else if (action === "retry-map") {
             initializeMap({ manual: true });
+        } else if (action === "retry-tiles") {
+            retryTiles();
         } else if (action === "clear") {
             selectedFlightNumber = null;
             updateFlightListSelection();
@@ -615,6 +676,7 @@ if (root) {
         () => {
             stopTimers();
             if (mapRetryTimer !== null) window.clearTimeout(mapRetryTimer);
+            clearTileRetry();
             map?.remove();
         },
         { once: true },
