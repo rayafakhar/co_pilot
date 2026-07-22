@@ -113,6 +113,15 @@ missing JavaScript bundle. A base-script handshake exposes a server-rendered lin
 the flight board even when the map bundle never runs. A `<noscript>` fallback covers
 JavaScript-disabled browsers.
 
+MapLibre startup has a bounded wait, two automatic retries, and a manual renderer
+retry. Raster failures do not tear down the operational map: the failed layer is
+paused, a local geographic grid stays visible, and fresh raster sources are attempted
+after 1.5, 5, and 15 seconds. The warning also offers an immediate manual retry. A
+recovered layer is shown only after an image tile has produced a valid texture.
+
+See [Map troubleshooting](MAP_TROUBLESHOOTING.md) for the small diagnostic bundle to
+collect if a browser still presents a blank map.
+
 ## 12. What real ADS-B would require
 
 A real tracking product would replace schedule interpolation with a licensed and
