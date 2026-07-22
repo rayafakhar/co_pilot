@@ -189,6 +189,20 @@
 .map-stage-state strong { color: var(--ink); font: 1.1rem var(--display); }
 .map-stage-state span { max-width: 400px; font-size: 0.78rem; }
 .map-stage-state a { margin-top: 8px; color: var(--sky); font: 0.72rem var(--data); }
+.map-stage-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.map-stage-actions button {
+    min-height: 40px;
+    border: 1px solid #315166;
+    border-radius: 4px;
+    padding: 0 12px;
+    color: var(--ink);
+    background: rgba(7, 16, 25, 0.92);
+    cursor: pointer;
+    font: 700 0.62rem var(--display);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+.map-stage-actions button:hover { border-color: var(--sky); color: var(--sky); }
 .map-stage-state--error strong { color: var(--red); }
 
 .map-loader {

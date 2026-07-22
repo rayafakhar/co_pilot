@@ -58,7 +58,10 @@
             <div class="map-stage-state map-stage-state--error" data-map-fatal hidden>
                 <strong>Map rendering is unavailable</strong>
                 <span>Flight data and detail links remain available in the control panel.</span>
-                <a href="{% url 'tracker:flight_board' %}">Open the flight board</a>
+                <div class="map-stage-actions">
+                    <button type="button" data-map-action="retry-map">Retry map renderer</button>
+                    <a href="{% url 'tracker:flight_board' %}">Open the flight board</a>
+                </div>
             </div>
 
             <div class="map-control-deck" aria-label="Map controls">

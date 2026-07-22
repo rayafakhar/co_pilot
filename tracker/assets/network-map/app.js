@@ -30,6 +30,7 @@ import {
 } from "./state.js";
 
 const root = document.querySelector("[data-network-map]");
+const MAP_INITIALIZATION_RETRY_DELAYS = [750, 2_000];
 
 if (root) {
     document.documentElement.classList.add("map-bundle-loaded");
@@ -80,6 +81,9 @@ if (root) {
     let map = null;
     let mapReady = false;
     let mapFatal = false;
+    let mapInitializing = false;
+    let mapInitializationFailures = 0;
+    let mapRetryTimer = null;
     let tileError = false;
     let dataError = false;
     let requestController = null;
@@ -141,7 +145,7 @@ if (root) {
 
     function renderUiState({ loading = false } = {}) {
         const state = deriveUiState({
-            loading,
+            loading: loading || (!mapReady && !mapFatal),
             hasPayload: latestPayload !== null,
             flightCount: flightState.flights.size,
             dataError,
@@ -467,13 +471,36 @@ if (root) {
         }
     }
 
-    async function initializeMap() {
+    function discardMap() {
+        mapReady = false;
+        root.classList.remove("is-map-ready");
+        try {
+            map?.remove();
+        } catch {
+            // A partially initialized renderer may not support complete teardown.
+        }
+        map = null;
+    }
+
+    async function initializeMap({ manual = false } = {}) {
+        if (mapInitializing) return;
+        if (manual) {
+            if (mapRetryTimer !== null) window.clearTimeout(mapRetryTimer);
+            mapRetryTimer = null;
+            mapInitializationFailures = 0;
+        }
         if (!config?.tileUrl || !config?.aircraftIconUrl) {
             mapFatal = true;
             renderUiState();
             setFeedMessage("Map configuration is unavailable", { error: true });
             return;
         }
+        mapInitializing = true;
+        mapFatal = false;
+        root.classList.remove("is-map-fatal");
+        discardMap();
+        renderUiState({ loading: true });
+        if (manual) setFeedMessage("Retrying map renderer");
         try {
             map = createNetworkMap(maplibregl, dom.map, config, () => {
                 tileError = true;
@@ -482,7 +509,9 @@ if (root) {
             await waitForMapLoad(map);
             await installOperationalLayers(map, config.aircraftIconUrl);
             mapReady = true;
+            mapInitializationFailures = 0;
             root.classList.add("is-map-ready");
+            renderUiState();
             bindMapSelection();
             if (latestPayload) {
                 airportsForMap = prepareAirportLabels(map, latestPayload.airports);
@@ -491,14 +520,35 @@ if (root) {
                     fitNetworkBounds(map, latestPayload.bounds);
                     fittedInitialNetwork = true;
                 }
+                if (!dataError) setFeedMessage(authoritativeFeedMessage());
             }
-        } catch {
-            mapFatal = true;
-            root.classList.add("is-map-fatal");
-            renderUiState();
-            setFeedMessage("Map rendering unavailable · flight index remains active", {
-                error: true,
-            });
+        } catch (error) {
+            console.error("[network-map] MapLibre initialization failed.", error);
+            discardMap();
+            const retryDelay =
+                MAP_INITIALIZATION_RETRY_DELAYS[mapInitializationFailures];
+            mapInitializationFailures += 1;
+            if (retryDelay !== undefined) {
+                setFeedMessage(
+                    `Map renderer interrupted · retrying ${mapInitializationFailures}/${MAP_INITIALIZATION_RETRY_DELAYS.length}`,
+                    { stale: latestPayload !== null },
+                );
+                mapRetryTimer = window.setTimeout(() => {
+                    mapRetryTimer = null;
+                    initializeMap();
+                }, retryDelay);
+                renderUiState({ loading: true });
+            } else {
+                mapFatal = true;
+                root.classList.add("is-map-fatal");
+                renderUiState();
+                setFeedMessage(
+                    "Map rendering unavailable · flight index remains active",
+                    { error: true },
+                );
+            }
+        } finally {
+            mapInitializing = false;
         }
     }
 
@@ -538,6 +588,8 @@ if (root) {
             }
         } else if (action === "refresh") {
             refreshNetwork();
+        } else if (action === "retry-map") {
+            initializeMap({ manual: true });
         } else if (action === "clear") {
             selectedFlightNumber = null;
             updateFlightListSelection();
@@ -562,6 +614,7 @@ if (root) {
         "pagehide",
         () => {
             stopTimers();
+            if (mapRetryTimer !== null) window.clearTimeout(mapRetryTimer);
             map?.remove();
         },
         { once: true },

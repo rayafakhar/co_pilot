@@ -70,9 +70,13 @@ export function createNetworkMap(maplibregl, container, config, onTileError) {
     return map;
 }
 
-export function waitForMapLoad(map) {
+export function waitForMapLoad(map, { timeoutMs = 6_000 } = {}) {
     if (map.isStyleLoaded()) return Promise.resolve();
     return new Promise((resolve, reject) => {
+        const timeoutId = globalThis.setTimeout(() => {
+            cleanup();
+            reject(new Error("MapLibre style initialization timed out."));
+        }, timeoutMs);
         const onLoad = () => {
             cleanup();
             resolve();
@@ -84,6 +88,7 @@ export function waitForMapLoad(map) {
             }
         };
         const cleanup = () => {
+            globalThis.clearTimeout(timeoutId);
             map.off("style.load", onLoad);
             map.off("error", onError);
         };

@@ -32,6 +32,25 @@ describe("MapLibre source updates", () => {
         expect(map.off).toHaveBeenCalledWith("style.load", expect.any(Function));
     });
 
+    it("rejects initialization instead of waiting forever for a missing style event", async () => {
+        vi.useFakeTimers();
+        const map = {
+            isStyleLoaded: () => false,
+            on: vi.fn(),
+            off: vi.fn(),
+        };
+        const result = waitForMapLoad(map, { timeoutMs: 500 }).catch(
+            (error) => error,
+        );
+        await vi.advanceTimersByTimeAsync(500);
+        expect(await result).toEqual(
+            new Error("MapLibre style initialization timed out."),
+        );
+        expect(map.off).toHaveBeenCalledWith("style.load", expect.any(Function));
+        expect(map.off).toHaveBeenCalledWith("error", expect.any(Function));
+        vi.useRealTimers();
+    });
+
     it("updates only moving sources on an animation frame", () => {
         const map = mapDouble();
         const data = {
