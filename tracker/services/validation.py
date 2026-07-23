@@ -149,15 +149,19 @@ def validate_schedule(
 
     # ── Crew-specific validations ──────────────────────────────────────────
     all_flights_list = list(flights)
+    flight_ids = [f.id for f in all_flights_list]
+    
+    # Get crew member IDs directly from the values_list query
+    crew_member_ids = set(
+        FlightCrew.objects.filter(
+            flight_id__in=flight_ids
+        ).values_list("crew_member_id", flat=True)
+    )
+    
     crew_member_set = set(
         CrewMember.objects.filter(
-            id__in=set(
-                fc.crew_member_id
-                for fc in FlightCrew.objects.filter(
-                    flight_id__in=[f.id for f in all_flights_list]
-                ).values_list("crew_member_id", flat=True)
-            )
-        )
+            id__in=crew_member_ids
+        ).values_list("id", flat=True)
     )
 
     for crew_member in crew_member_set:

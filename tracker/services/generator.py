@@ -11,13 +11,31 @@ from math import ceil
 from django.db import transaction
 from django.utils import timezone
 
-from tracker.models import Aircraft, AircraftType, Airport, Flight, MaintenanceBlock
+from tracker.models import Aircraft, AircraftType, Airport, CrewMember, Flight, FlightCrew, MaintenanceBlock
 
 from .clock import initialize_simulation_clock, reset_simulation_clock
 from .distance import calculate_duration, haversine_distance_km, practical_range_km
 from .fixtures import load_reference_data
 from .status import get_flight_status
 from .validation import ScheduleViolation, validate_schedule, violation_counts
+
+# Mock crew data pool for generation
+MOCK_FIRST_NAMES = [
+    "James", "Sarah", "Michael", "Emily", "David", "Jessica",
+    "Robert", "Amanda", "Daniel", "Stephanie", "John", "Rebecca",
+    "William", "Nicole", "Christopher", "Lauren", "Matthew", "Megan",
+    "Andrew", "Rachel", "Mark", "Ashley", "Steven", "Samantha",
+    "Brian", "Katie", "Jason", "Laura", "Kevin", "Elizabeth",
+]
+MOCK_LAST_NAMES = [
+    "Smith", "Johnson", "Brown", "Davis", "Wilson", "Clark",
+    "Lewis", "Hall", "Young", "King", "Wright", "Scott",
+    "Green", "Baker", "Adams", "Nelson", "Hill", "Campbell",
+    "Mitchell", "Roberts", "Carter", "Perez", "Robinson", "Turner",
+    "Phillips", "Parker", "Evans", "Edwards", "Collins", "Stewart",
+]
+PILOT_NAMES = MOCK_FIRST_NAMES[:10] + MOCK_LAST_NAMES[:10]  # First 10 of each
+FA_NAMES = MOCK_FIRST_NAMES[10:] + MOCK_LAST_NAMES[10:]  # Remaining
 
 
 class ScheduleGenerationError(RuntimeError):
@@ -100,11 +118,119 @@ def generation_anchor(config: GenerationConfig) -> datetime:
 
 
 def _clear_simulation_data() -> None:
+    FlightCrew.objects.all().delete()
+    CrewMember.objects.all().delete()
     MaintenanceBlock.objects.all().delete()
     Flight.objects.all().delete()
     Aircraft.objects.all().delete()
     AircraftType.objects.all().delete()
     Airport.objects.all().delete()
+
+
+def _get_mock_profile_path(index: int) -> str:
+    """Return a generic profile image path for mock crew members."""
+    return "crew/profiles/default_crew_" + str(index + 1).zfill(2) + ".png"
+
+
+def _create_crew(count: int = 20, seed: int = 42) -> list[CrewMember]:
+    """Create a pool of mock crew members (10 pilots, 10 flight attendants).
+    
+    Uses deterministic naming based on the provided seed to create consistent
+    crew members across runs.
+    """
+    rng = random.Random(seed)
+    crew_members: list[CrewMember] = []
+    
+    all_names = list(zip(
+        MOCK_FIRST_NAMES * 2,
+        MOCK_LAST_NAMES * 2,
+    ))
+    rng.shuffle(all_names)
+    
+    for i in range(count):
+        first_name, last_name = all_names[i % len(all_names)]
+        # First 10 are pilots, rest are flight attendants
+        role = CrewMember.Role.PILOT if i < 10 else CrewMember.Role.FLIGHT_ATTENDANT
+        
+        crew_member = CrewMember(
+            first_name=first_name,
+            last_name=last_name,
+            role=role,
+            profile_picture=_get_mock_profile_path(i),
+        )
+        crew_member.full_clean()
+        crew_members.append(crew_member)
+    
+    # Bulk create all crew members
+    CrewMember.objects.bulk_create(crew_members)
+    return list(CrewMember.objects.all().order_by("pk"))
+
+
+class CrewAssignmentError(RuntimeError):
+    """Raised when crew cannot be assigned without violating rules."""
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
+@dataclass
+class _CrewMemberState:
+    """Tracks the scheduling state of a crew member for validation."""
+    last_flight_effective_arrival: datetime | None = None
+    last_flight_arrival_airport: Airport | None = None
+
+
+def _can_assign_crew_to_flight(
+    crew_member: CrewMember,
+    flight: Flight,
+    crew_states: dict[int, _CrewMemberState],
+    all_flights_for_validation: list[Flight],
+) -> tuple[bool, str]:
+    """Check if a crew member can be assigned to a flight without violating rules.
+    
+    Returns:
+        (can_assign, reason_if_not)
+    """
+    anchor = flight.scheduled_departure
+    
+    # Get existing FlightCrew records for this crew member (excluding current flight if updating)
+    existing_assignments = FlightCrew.objects.filter(
+        crew_member=crew_member
+    ).select_related("flight")
+    
+    # Build temporary list including the flight we're trying to assign
+    test_flights = list(all_flights_for_validation)
+    test_flight = Flight.objects.get(pk=flight.pk)  # Get fresh copy
+    crew_states_copy = dict(crew_states)
+    test_state = _CrewMemberState(
+        last_flight_effective_arrival=crew_states.get(crew_member.pk, _CrewMemberState()).last_flight_effective_arrival,
+        last_flight_arrival_airport=crew_states.get(crew_member.pk, _CrewMemberState()).last_flight_arrival_airport,
+    )
+    
+    # Check against existing FlightCrew assignments
+    for fc in existing_assignments:
+        other_flight = fc.flight
+        if other_flight.pk == flight.pk:
+            continue
+            
+        other_eff_dep = other_flight.estimated_departure or other_flight.scheduled_departure
+        other_eff_arr = other_flight.estimated_arrival or other_flight.scheduled_arrival
+        
+        # Rule 1: No double-booking (overlap check)
+        if not (anchor >= other_eff_arr or other_eff_dep >= flight.estimated_arrival or other_eff_arr):
+            return False, "Double-booking: schedule overlap with another flight"
+    
+    # Rule 2: 8-hour rest rule
+    if test_state.last_flight_effective_arrival:
+        rest_period = anchor - test_state.last_flight_effective_arrival
+        if rest_period < timedelta(hours=8):
+            return False, f"Insufficient rest: only {rest_period.total_seconds()/3600:.1f} hours since last arrival"
+    
+    # Rule 3: Geographic continuity
+    if test_state.last_flight_arrival_airport:
+        if flight.departure_airport.pk != test_state.last_flight_arrival_airport.pk:
+            return False, f"Geographic violation: last landed at {test_state.last_flight_arrival_airport}, but next departs from {flight.departure_airport}"
+    
+    return True, ""
 
 
 def _create_aircraft(
@@ -298,6 +424,121 @@ def _build_itinerary(
     return flights, maintenance_blocks, last_known_airport
 
 
+def _assign_crew_to_flights(
+    flights: list[Flight],
+    crew: list[CrewMember],
+    rng: random.Random,
+    config: GenerationConfig,
+) -> None:
+    """Assign crew members to flights respecting validation rules.
+    
+    This function assigns pilots and flight attendants to non-cancelled flights,
+    ensuring:
+    - No double-booking (crew can't overlap on flights)
+    - 8-hour minimum rest between flights
+    - Geographic continuity (crew must depart from where they arrived)
+    
+    Each flight gets at least 2 pilots and 2 flight attendants (based on flight type).
+    """
+    if not crew:
+        return
+    
+    pilots = [c for c in crew if c.role == CrewMember.Role.PILOT]
+    flight_attendants = [c for c in crew if c.role == CrewMember.Role.FLIGHT_ATTENDANT]
+    
+    # Filter to non-cancelled flights and sort by departure time
+    operable_flights = [f for f in flights if f.status != Flight.Status.CANCELLED]
+    operable_flights.sort(key=lambda f: (f.scheduled_departure, f.departure_airport.pk))
+    
+    # Track state for each crew member
+    crew_states: dict[int, _CrewMemberState] = {}
+    
+    for flight in operable_flights:
+        eff_departure = flight.estimated_departure or flight.scheduled_departure
+        eff_arrival = flight.estimated_arrival or flight.scheduled_arrival
+        
+        # Determine crew needs based on flight type
+        needs_pilots = 2
+        needs_fas = 2 if flight.flight_type == Flight.FlightType.PASSENGER else 1
+        
+        # Track which crew are assigned to this flight for state updates
+        assigned_this_flight: list[int] = []
+        
+        def can_use_crew(crew_member: CrewMember) -> bool:
+            """Check if crew member can fly this flight."""
+            state = crew_states.get(crew_member.pk)
+            if not state:
+                state = _CrewMemberState()
+            
+            # Check 8-hour rest rule
+            if state.last_flight_effective_arrival:
+                rest_needed = eff_departure - state.last_flight_effective_arrival
+                if rest_needed < timedelta(hours=8):
+                    return False
+            
+            # Check geographic continuity
+            if state.last_flight_arrival_airport:
+                if flight.departure_airport.pk != state.last_flight_arrival_airport.pk:
+                    # Allow if this is one of the first few flights for the crew member
+                    # (they might be starting their schedule)
+                    if state.last_flight_effective_arrival:
+                        return False
+            
+            # Check no overlapping assignments
+            for fc in FlightCrew.objects.filter(crew_member=crew_member).select_related("flight"):
+                other = fc.flight
+                if other.pk == flight.pk:
+                    continue
+                other_eff_dep = other.estimated_departure or other.scheduled_departure
+                other_eff_arr = other.estimated_arrival or other.scheduled_arrival
+                # Check overlap
+                if not (eff_departure >= other_eff_arr or other_eff_dep >= eff_arrival):
+                    return False
+            
+            return True
+        
+        def assign_crew_member(crew_member: CrewMember) -> None:
+            """Assign crew member to flight and update state."""
+            fc = FlightCrew(
+                crew_member=crew_member,
+                flight=flight,
+            )
+            fc.full_clean()
+            fc.save()
+            
+            if crew_member.pk not in crew_states:
+                crew_states[crew_member.pk] = _CrewMemberState()
+            crew_states[crew_member.pk].last_flight_effective_arrival = eff_arrival
+            crew_states[crew_member.pk].last_flight_arrival_airport = (
+                flight.diversion_airport or flight.arrival_airport
+            )
+            assigned_this_flight.append(crew_member.pk)
+        
+        # Assign pilots
+        pilots_assigned = 0
+        available_pilots = list(pilots)
+        rng.shuffle(available_pilots)
+        
+        for pilot in available_pilots:
+            if pilots_assigned >= needs_pilots:
+                break
+            if can_use_crew(pilot):
+                assign_crew_member(pilot)
+                pilots_assigned += 1
+        
+        # Assign flight attendants
+        fass_assigned = 0
+        available_fas = list(flight_attendants)
+        rng.shuffle(available_fas)
+        
+        for fa in available_fas:
+            if fass_assigned >= needs_fas:
+                break
+            if can_use_crew(fa):
+                assign_crew_member(fa)
+                fass_assigned += 1
+
+
 def _populate_report(
     report: GenerationReport,
     flights: list[Flight],
@@ -343,6 +584,10 @@ def generate_schedule(config: GenerationConfig) -> GenerationReport:
             aircraft.maintenance_status = Aircraft.MaintenanceStatus.SCHEDULED
         aircraft.save(update_fields=["last_known_airport", "maintenance_status"])
 
+    # Create crew members
+    crew = _create_crew(count=20, seed=config.seed + 1000)
+    
+    # Load existing database records
     stored_flights = list(
         Flight.objects.select_related(
             "aircraft__aircraft_type",
@@ -353,14 +598,33 @@ def generate_schedule(config: GenerationConfig) -> GenerationReport:
         )
     )
     stored_blocks = list(MaintenanceBlock.objects.select_related("aircraft"))
+    
+    # Bulk create flights first (so they have PKs for crew assignment)
+    Flight.objects.bulk_create(all_flights, batch_size=250)
+    MaintenanceBlock.objects.bulk_create(all_blocks, batch_size=100)
+    
+    # Reload flights from DB to get PKs
+    all_flights = list(Flight.objects.filter(
+        aircraft__in=[a.pk for a in fleet]
+    ).select_related(
+        "aircraft__aircraft_type",
+        "departure_airport",
+        "arrival_airport",
+        "diversion_airport",
+    ))
+    
+    # Assign crew to flights after they have PKs
+    _assign_crew_to_flights(all_flights, crew, rng, config)
+    
+    # Validate entire schedule
     violations = validate_schedule(
         [*stored_flights, *all_flights],
         [*stored_blocks, *all_blocks],
     )
     if violations:
         raise ScheduleGenerationError(violations)
-    Flight.objects.bulk_create(all_flights, batch_size=250)
-    MaintenanceBlock.objects.bulk_create(all_blocks, batch_size=100)
+    
+    # Initialize/reset simulation clock
     clock_arguments = {
         "seed": config.seed,
         "schedule_anchor": anchor,
@@ -371,6 +635,7 @@ def generate_schedule(config: GenerationConfig) -> GenerationReport:
     else:
         initialize_simulation_clock(**clock_arguments)
 
+    # Build report
     report = GenerationReport(
         seed=config.seed,
         anchor_time=anchor,
