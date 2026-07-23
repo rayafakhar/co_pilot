@@ -68,6 +68,7 @@ export function buildMapCollections(
     const routes = emptyFeatureCollection();
     const completedRoutes = emptyFeatureCollection();
     const aircraft = emptyFeatureCollection();
+    const crew = emptyFeatureCollection();
 
     for (const flight of flights.values()) {
         const route = routeForFlight(routeCache, flight);
@@ -106,8 +107,30 @@ export function buildMapCollections(
                 progress: Math.round(progress * 100),
             },
         });
+
+        // Add crew marker features at the aircraft position
+        if (flight.crew && flight.crew.length > 0) {
+            const crewLngLat = position.geometry.coordinates;
+            for (let i = 0; i < flight.crew.length; i++) {
+                const member = flight.crew[i];
+                crew.features.push({
+                    type: "Feature",
+                    geometry: {
+                        type: "Point",
+                        coordinates: [
+                            crewLngLat[0] + (i - (flight.crew.length - 1) / 2) * 0.15,
+                            crewLngLat[1] + 0.12,
+                        ],
+                    },
+                    properties: {
+                        crew_icon: `crew-icon-${member.name.replace(/\s+/g, "-").toLowerCase()}`,
+                        flight_number: flight.flight_number,
+                    },
+                });
+            }
+        }
     }
-    return { routes, completedRoutes, aircraft };
+    return { routes, completedRoutes, aircraft, crew };
 }
 
 export function selectedRouteCollection(flight, routeCache) {

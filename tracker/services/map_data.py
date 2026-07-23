@@ -66,6 +66,20 @@ def serialize_map_flight(
         return None
 
     aircraft_type = flight.aircraft.aircraft_type
+
+    # Minimal crew picture URLs for map marker icons
+    crew_pictures = []
+    for fc in flight.flight_crew.select_related("crew_member")[:3]:  # Limit to 3 for map display
+        crew_member = fc.crew_member
+        if crew_member.profile_picture:
+            from django.templatetags.static import static
+            picture_url = static(crew_member.profile_picture.name)
+            crew_pictures.append({
+                "name": crew_member.full_name(),
+                "picture": picture_url,
+                "role": crew_member.role,
+            })
+
     return {
         "flight_number": flight.flight_number,
         "aircraft_registration": flight.aircraft.registration,
@@ -86,6 +100,7 @@ def serialize_map_flight(
             "tracker:aircraft_detail",
             args=[flight.aircraft.registration],
         ),
+        "crew": crew_pictures,
     }
 
 

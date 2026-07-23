@@ -7,6 +7,7 @@ from datetime import timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
 from django.urls import reverse
+from django.templatetags.static import static
 
 from tracker.models import Flight
 
@@ -45,6 +46,22 @@ def serialize_flight(flight: Flight, at_time: datetime) -> dict[str, object]:
         and flight.actual_arrival is None
     )
     result_airport = flight.diversion_airport or flight.arrival_airport
+
+    # Serialize crew members assigned to this flight
+    crew_list = []
+    for fc in flight.flight_crew.select_related("crew_member").all():
+        crew_member = fc.crew_member
+        picture_url = None
+        if crew_member.profile_picture:
+            picture_url = static(crew_member.profile_picture.name)
+        crew_list.append({
+            "full_name": crew_member.full_name(),
+            "role": crew_member.get_role_display(),
+            "role_code": crew_member.role,
+            "profile_picture": picture_url,
+        })
+    crew_list.sort(key=lambda c: (c["role"], c["full_name"]))
+
     return {
         "flight_number": flight.flight_number,
         "flight_url": reverse("tracker:flight_detail", args=[flight.flight_number]),
@@ -91,4 +108,5 @@ def serialize_flight(flight: Flight, at_time: datetime) -> dict[str, object]:
         "distance": f"{flight.distance_km:,} km",
         "duration": duration_label(flight.planned_duration_minutes),
         "gate": flight.departure_gate or "TBA",
+        "crew": crew_list,
     }

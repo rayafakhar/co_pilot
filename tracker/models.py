@@ -9,6 +9,9 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import F, Q
 
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
 from .validators import validate_iana_timezone, validate_iata_code, validate_icao_code
 
 
@@ -385,3 +388,54 @@ class MaintenanceBlock(models.Model):
 
     def __str__(self) -> str:
         return f"{self.aircraft.registration}: {self.reason}"
+
+
+class CrewMember(models.Model):
+    """A staff member (pilot or flight attendant) in the crew roster."""
+
+    class Role(models.TextChoices):
+        PILOT = "pilot", "Pilot"
+        FLIGHT_ATTENDANT = "flight_attendant", "Flight Attendant"
+
+    first_name = models.CharField(max_length=120)
+    last_name = models.CharField(max_length=120)
+    role = models.CharField(max_length=20, choices=Role.choices)
+    profile_picture = models.ImageField(
+        upload_to="crew/pictures/",
+        blank=True,
+        null=True,
+        help_text="Profile picture displayed on flight details and map markers.",
+    )
+
+    class Meta:
+        ordering = ["last_name", "first_name", "role"]
+        verbose_name = "Crew member"
+        verbose_name_plural = "Crew members"
+
+    def __str__(self) -> str:
+        return f"{self.first_name} {self.last_name} ({self.get_role_display()})"
+
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
+
+    full_name.short_description = "Full Name"
+
+
+class FlightCrew(models.Model):
+    """Through table linking crew members to flights with uniqueness enforcement."""
+
+    flight = models.ForeignKey(Flight, on_delete=models.CASCADE, related_name="flight_crew")
+    crew_member = models.ForeignKey(CrewMember, on_delete=models.CASCADE, related_name="assigned_flights")
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["flight", "crew_member"],
+                name="unique_crew_flight_assignment",
+            )
+        ]
+        ordering = ["crew_member__last_name", "crew_member__first_name"]
+
+    def __str__(self) -> str:
+        return f"{self.crew_member} → {self.flight.flight_number}"
