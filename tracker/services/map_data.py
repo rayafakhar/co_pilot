@@ -73,7 +73,7 @@ def serialize_map_flight(
         crew_member = fc.crew_member
         if crew_member.profile_picture:
             from django.templatetags.static import static
-            picture_url = static(crew_member.profile_picture.name)
+            picture_url = static(crew_member.profile_picture)
             crew_pictures.append({
                 "name": crew_member.full_name(),
                 "picture": picture_url,

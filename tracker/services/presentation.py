@@ -47,13 +47,14 @@ def serialize_flight(flight: Flight, at_time: datetime) -> dict[str, object]:
     )
     result_airport = flight.diversion_airport or flight.arrival_airport
 
-    # Serialize crew members assigned to this flight
     crew_list = []
     for fc in flight.flight_crew.select_related("crew_member").all():
         crew_member = fc.crew_member
         picture_url = None
         if crew_member.profile_picture:
-            picture_url = static(crew_member.profile_picture.name)
+            from django.templatetags.static import static
+            # CHANGED: Passed the string directly
+        picture_url = static(crew_member.profile_picture)        
         crew_list.append({
             "full_name": crew_member.full_name(),
             "role": crew_member.get_role_display(),
@@ -61,6 +62,7 @@ def serialize_flight(flight: Flight, at_time: datetime) -> dict[str, object]:
             "profile_picture": picture_url,
         })
     crew_list.sort(key=lambda c: (c["role"], c["full_name"]))
+
 
     return {
         "flight_number": flight.flight_number,

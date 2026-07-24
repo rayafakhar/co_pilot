@@ -391,8 +391,6 @@ class MaintenanceBlock(models.Model):
 
 
 class CrewMember(models.Model):
-    """A staff member (pilot or flight attendant) in the crew roster."""
-
     class Role(models.TextChoices):
         PILOT = "pilot", "Pilot"
         FLIGHT_ATTENDANT = "flight_attendant", "Flight Attendant"
@@ -400,11 +398,13 @@ class CrewMember(models.Model):
     first_name = models.CharField(max_length=120)
     last_name = models.CharField(max_length=120)
     role = models.CharField(max_length=20, choices=Role.choices)
-    profile_picture = models.ImageField(
-        upload_to="crew/pictures/",
+    
+    # CHANGED: Now a CharField pointing to our static SVGs
+    profile_picture = models.CharField(
+        max_length=255,
         blank=True,
-        null=True,
-        help_text="Profile picture displayed on flight details and map markers.",
+        default="",
+        help_text="Repository-local static path for crew profile avatar SVG.",
     )
 
     class Meta:

@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from datetime import timezone as dt_timezone
 from math import ceil
+from pathlib import Path
 
 from django.db import transaction
 from django.utils import timezone
@@ -116,6 +117,65 @@ def generation_anchor(config: GenerationConfig) -> datetime:
     baseline = datetime(2020, 1, 1, 12, tzinfo=dt_timezone.utc)
     return baseline + timedelta(days=abs(config.seed) % 3_653)
 
+def _generate_crew_svgs(output_dir: Path) -> None:
+    from django.conf import settings
+    crew_dir = settings.BASE_DIR / "tracker" / "static" / "tracker" / "images" / "crew"
+    crew_dir.mkdir(parents=True, exist_ok=True)
+
+    # 5 Better-aligned minimalist vector hairstyles
+    hair_paths = [
+        # 1. Short/Parted
+        '<path d="M 33 42 C 30 25, 45 15, 60 22 C 67 25, 68 35, 66 42 C 63 32, 55 25, 45 28 C 38 30, 35 38, 33 42 Z" fill="#10202e" stroke="#53c7ed" stroke-width="1.5" stroke-linejoin="round"/>',
+        # 2. Bob cut
+        '<path d="M 35 30 C 35 15, 65 15, 65 30 L 68 55 C 60 58, 55 50, 50 45 C 45 50, 40 58, 32 55 Z" fill="#10202e" stroke="#53c7ed" stroke-width="1.5" stroke-linejoin="round"/>',
+        # 3. Spiky/Textured
+        '<path d="M 33 40 L 35 25 L 42 30 L 50 18 L 56 28 L 65 22 L 67 40 C 60 30, 40 30, 33 40 Z" fill="#10202e" stroke="#53c7ed" stroke-width="1.5" stroke-linejoin="round"/>',
+        # 4. Top Bun
+        '<path d="M 35 35 C 35 15, 65 15, 65 35 C 60 25, 40 25, 35 35 Z" fill="#10202e" stroke="#53c7ed" stroke-width="1.5"/><circle cx="50" cy="18" r="8" fill="#10202e" stroke="#53c7ed" stroke-width="1.5"/>',
+        # 5. Clean Fade (Just a hairline accent)
+        '<path d="M 33 42 C 35 20, 65 20, 67 42" fill="none" stroke="#53c7ed" stroke-width="1.5" stroke-linecap="round"/>',
+    ]
+
+    for i in range(20):
+        is_pilot = i < 10
+        hair = hair_paths[i % len(hair_paths)]
+        has_glasses = (i % 3) == 0
+        
+        svg = [
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">',
+            # Background circle
+            '<circle cx="50" cy="50" r="48" fill="#071019" stroke="#53c7ed" stroke-width="2"/>',
+            # Shoulders / Torso
+            '<path d="M 20 100 C 20 65, 35 60, 50 60 C 65 60, 80 65, 80 100 Z" fill="#10202e" stroke="#53c7ed" stroke-width="1.5"/>',
+        ]
+        
+        # Attire Overlay
+        if is_pilot:
+            # White collar shirt V-neck and Tie
+            svg.append('<path d="M 50 78 L 40 60 L 45 60 L 50 68 L 55 60 L 60 60 Z" fill="#dce9f1" stroke="#53c7ed" stroke-width="1"/>')
+            svg.append('<path d="M 48 68 L 52 68 L 54 85 L 50 92 L 46 85 Z" fill="#10202e" stroke="#53c7ed" stroke-width="1"/>')
+        else:
+            # Flight Attendant Scarf
+            svg.append('<path d="M 43 60 C 43 75, 57 75, 57 60 Z" fill="#dce9f1" stroke="#53c7ed" stroke-width="1"/>')
+            svg.append('<path d="M 50 68 C 55 75, 58 85, 55 90 C 50 85, 48 75, 50 68 Z" fill="#10202e" stroke="#53c7ed" stroke-width="1"/>')
+
+        # Neck & Head
+        svg.append('<path d="M 45 62 L 45 50 L 55 50 L 55 62 Z" fill="#10202e" stroke="#53c7ed" stroke-width="1.5"/>')
+        svg.append('<circle cx="50" cy="40" r="15" fill="#10202e" stroke="#53c7ed" stroke-width="1.5"/>')
+        
+        # Hair
+        svg.append(hair)
+        
+        # Eyewear (Sleek half-rim glasses)
+        if has_glasses:
+            svg.append('<path d="M 32 38 L 40 38 Q 44 42 48 38 L 52 38 Q 56 42 60 38 L 68 38" fill="none" stroke="#53c7ed" stroke-width="1.5" stroke-linecap="round"/>')
+            svg.append('<path d="M 34 38 A 6 6 0 0 0 46 38" fill="none" stroke="#53c7ed" stroke-width="1.5"/>')
+            svg.append('<path d="M 54 38 A 6 6 0 0 0 66 38" fill="none" stroke="#53c7ed" stroke-width="1.5"/>')
+            
+        svg.append('</svg>')
+        
+        file_path = crew_dir / f"crew_{i+1:02d}.svg"
+        file_path.write_text("\n".join(svg), encoding="utf-8")
 
 def _clear_simulation_data() -> None:
     FlightCrew.objects.all().delete()
@@ -133,38 +193,29 @@ def _get_mock_profile_path(index: int) -> str:
 
 
 def _create_crew(count: int = 20, seed: int = 42) -> list[CrewMember]:
-    """Create a pool of mock crew members (10 pilots, 10 flight attendants).
-    
-    Uses deterministic naming based on the provided seed to create consistent
-    crew members across runs.
-    """
     rng = random.Random(seed)
     crew_members: list[CrewMember] = []
     
-    all_names = list(zip(
-        MOCK_FIRST_NAMES * 2,
-        MOCK_LAST_NAMES * 2,
-    ))
+    _generate_crew_svgs(Path("."))
+    
+    all_names = list(zip(MOCK_FIRST_NAMES * 2, MOCK_LAST_NAMES * 2))
     rng.shuffle(all_names)
     
     for i in range(count):
         first_name, last_name = all_names[i % len(all_names)]
-        # First 10 are pilots, rest are flight attendants
         role = CrewMember.Role.PILOT if i < 10 else CrewMember.Role.FLIGHT_ATTENDANT
         
         crew_member = CrewMember(
             first_name=first_name,
             last_name=last_name,
             role=role,
-            profile_picture=_get_mock_profile_path(i),
+            profile_picture=f"tracker/images/crew/crew_{i+1:02d}.svg",
         )
         crew_member.full_clean()
         crew_members.append(crew_member)
     
-    # Bulk create all crew members
     CrewMember.objects.bulk_create(crew_members)
     return list(CrewMember.objects.all().order_by("pk"))
-
 
 class CrewAssignmentError(RuntimeError):
     """Raised when crew cannot be assigned without violating rules."""
@@ -537,7 +588,26 @@ def _assign_crew_to_flights(
             if can_use_crew(fa):
                 assign_crew_member(fa)
                 fass_assigned += 1
+    for crew_member in crew:
+            assigned = list(FlightCrew.objects.filter(crew_member=crew_member).select_related("flight").order_by("flight__scheduled_departure"))
+            for i in range(len(assigned) - 1):
+                f1 = assigned[i].flight
+                f2 = assigned[i+1].flight
+                
+                arr1 = f1.actual_arrival or f1.estimated_arrival or f1.scheduled_arrival
+                dep2 = f2.estimated_departure or f2.scheduled_departure
+                
+                land_ap1 = f1.diversion_airport_id or f1.arrival_airport_id
+                dep_ap2 = f2.departure_airport_id
 
+                assert dep2 >= arr1 + timedelta(hours=8), (
+                    f"Rest violation for {crew_member.full_name()}: {f2.flight_number} departs "
+                    f"less than 8h after {f1.flight_number} arrival."
+                )
+                assert dep_ap2 == land_ap1, (
+                    f"Geographic continuity violation for {crew_member.full_name()}: "
+                    f"{f1.flight_number} landed at {land_ap1}, but {f2.flight_number} departs from {dep_ap2}."
+                )
 
 def _populate_report(
     report: GenerationReport,

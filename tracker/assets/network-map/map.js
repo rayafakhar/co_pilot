@@ -311,8 +311,7 @@ function createDefaultCrewIcon(role, size = 64) {
 /**
  * Load a profile image and cache the crew marker icon.
  */
-async function loadAndCacheCrewIcon(map, url, iconId) {
-    if (map.hasImage(iconId)) return;
+export async function loadAndCacheCrewIcon(map, url, iconId) {    if (map.hasImage(iconId)) return;
     try {
         const img = await loadImage(url);
         const imageData = createCrewPinImage(img);
