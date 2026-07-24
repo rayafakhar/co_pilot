@@ -3,7 +3,7 @@
 from django import forms
 from django.contrib import admin
 
-from .models import Aircraft, AircraftType, Airport, Flight, MaintenanceBlock
+from .models import Aircraft, AircraftType, Airport, CrewMember, Flight, FlightCrew, MaintenanceBlock
 from .services.validation import validate_schedule
 
 
@@ -158,6 +158,29 @@ class FlightAdmin(admin.ModelAdmin):
         if not obj.pk:
             return "Calculated after save"
         return obj.current_status
+
+
+@admin.register(CrewMember)
+class CrewMemberAdmin(admin.ModelAdmin):
+    list_display = ("full_name", "role", "has_profile_picture")
+    list_filter = ("role",)
+    search_fields = ("first_name", "last_name", "role")
+
+    @admin.display(description="Has Profile Picture")
+    def has_profile_picture(self, obj):
+        return bool(obj.profile_picture)
+    has_profile_picture.boolean = True
+
+
+@admin.register(FlightCrew)
+class FlightCrewAdmin(admin.ModelAdmin):
+    list_display = ("crew_member", "flight", "crew_role")
+    list_select_related = ("crew_member", "flight")
+    search_fields = ("crew_member__first_name", "crew_member__last_name", "flight__flight_number")
+
+    @admin.display(description="Role")
+    def crew_role(self, obj):
+        return obj.crew_member.role
 
 
 @admin.register(MaintenanceBlock)

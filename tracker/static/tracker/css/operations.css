@@ -314,6 +314,51 @@ h1, h2, h3 { font-family: var(--display); }
 .notice--danger { border-color: var(--red); }
 .notice--warning { border-color: var(--amber); }
 
+/* Crew section styles */
+.crew-section { grid-column: 1 / -1; }
+.crew-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+}
+.crew-card {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel-2);
+    transition: background .18s ease, border-color .18s ease;
+}
+.crew-card:hover {
+    background: var(--panel);
+    border-color: #315166;
+}
+.crew-avatar {
+    flex: 0 0 48px; width: 48px; height: 48px;
+    border-radius: 50%; overflow: hidden;
+    background: var(--night); border: 1px solid #315166;
+    display: grid; place-items: center;
+}
+.crew-avatar img {
+    width: 100%; height: 100%; object-fit: cover;
+}
+.crew-avatar svg { width: 32px; height: 32px; }
+.crew-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.crew-name {
+    color: var(--ink);
+    font: 700 0.82rem var(--data);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.crew-role {
+    color: var(--sky);
+    font-size: 0.63rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
 .site-footer { border-top: 1px solid var(--line); background: #060d14; }
 .footer-grid { min-height: 78px; display: flex; justify-content: space-between; align-items: center; gap: 20px; color: var(--faint); font-size: .68rem; }
 

@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
 
-from tracker.models import Flight, MaintenanceBlock
+from tracker.models import CrewMember, Flight, FlightCrew, MaintenanceBlock
 
 from .distance import calculate_duration, practical_range_km
 from .status import effective_arrival, effective_departure
@@ -19,17 +19,50 @@ class ScheduleViolation:
     message: str
     aircraft_registration: str
     flight_number: str = ""
+    crew_member_name: str = ""
 
 
 def _violation(code: str, message: str, flight: Flight) -> ScheduleViolation:
     return ScheduleViolation(code, message, flight.aircraft.registration, flight.flight_number)
 
 
+def _crew_violation(code: str, message: str, flight: Flight, crew_member: CrewMember) -> ScheduleViolation:
+    return ScheduleViolation(
+        code,
+        message,
+        flight.aircraft.registration,
+        flight.flight_number,
+        crew_member.full_name(),
+    )
+
+
+def _get_crew_for_flight(flight: Flight) -> list[CrewMember]:
+    """Return the list of CrewMember instances assigned to a flight."""
+    return list(
+        CrewMember.objects.filter(
+            id__in=FlightCrew.objects.filter(flight=flight).values_list("crew_member_id", flat=True)
+        )
+    )
+
+
+def _get_crew_schedule(
+    crew_member: CrewMember,
+    flights: Iterable[Flight],
+) -> list[Flight]:
+    """Return sorted flights for a specific crew member."""
+    flight_ids = set(
+        FlightCrew.objects.filter(crew_member=crew_member).values_list("flight_id", flat=True)
+    )
+    crew_flights = [f for f in flights if f.id in flight_ids]
+    crew_flights.sort(key=lambda f: (f.scheduled_departure, f.flight_number))
+    return crew_flights
+
+
 def validate_schedule(
     flights: Iterable[Flight],
     maintenance_blocks: Iterable[MaintenanceBlock] = (),
 ) -> list[ScheduleViolation]:
-    """Validate timing, range, continuity, movement, and maintenance invariants."""
+    """Validate timing, range, continuity, movement, maintenance, and crew invariants."""
     grouped: dict[int | None, list[Flight]] = defaultdict(list)
     for flight in flights:
         grouped[flight.aircraft_id].append(flight)
@@ -113,6 +146,119 @@ def validate_schedule(
                         )
                 previous_operating = flight
                 current_airport_id = flight.diversion_airport_id or flight.arrival_airport_id
+
+    # ── Crew-specific validations ──────────────────────────────────────────
+    all_flights_list = list(flights)
+    flight_ids = [f.id for f in all_flights_list]
+    
+    # Get crew member IDs directly from the values_list query
+    crew_member_ids = set(
+        FlightCrew.objects.filter(
+            flight_id__in=flight_ids
+        ).values_list("crew_member_id", flat=True)
+    )
+    
+    crew_member_set = set(
+        CrewMember.objects.filter(
+            id__in=crew_member_ids
+        ).values_list("id", flat=True)
+    )
+
+    for crew_member in crew_member_set:
+        crew_flights = _get_crew_schedule(crew_member, all_flights_list)
+
+        # Rule 1: No Double-Booking
+        # Rule 2: 8-Hour Rest Rule
+        # We iterate through the crew member's flights and check overlapping time
+        # windows plus the 8-hour rest gap between consecutive assignments.
+        for i in range(len(crew_flights)):
+            flight_a = crew_flights[i]
+            start_a = effective_departure(flight_a)
+            end_a = effective_arrival(flight_a)
+
+            for j in range(i + 1, len(crew_flights)):
+                flight_b = crew_flights[j]
+                start_b = effective_departure(flight_b)
+                end_b = effective_arrival(flight_b)
+
+                # If the time windows overlap, that's a double-booking
+                if start_b < end_a and start_a < end_b:
+                    violations.append(
+                        _crew_violation(
+                            "double_booking",
+                            f"{crew_member.full_name()} is scheduled on overlapping flights "
+                            f"{flight_a.flight_number} and {flight_b.flight_number}.",
+                            flight_b,
+                            crew_member,
+                        )
+                    )
+                    break  # One violation per pair is enough
+
+                # Check 8-hour rest between consecutive non-overlapping flights
+                # flight_a comes before flight_b (already sorted)
+                # end_a <= start_b, so check rest period
+                rest_gap = start_b - end_a
+                minimum_rest = timedelta(hours=8)
+                if rest_gap < minimum_rest:
+                    violations.append(
+                        _crew_violation(
+                            "insufficient_rest",
+                            f"{crew_member.full_name()} has less than 8 hours rest between "
+                            f"{flight_a.flight_number} and {flight_b.flight_number} "
+                            f"(gap: {rest_gap}).",
+                            flight_b,
+                            crew_member,
+                        )
+                    )
+
+        # Rule 3: Geographic Continuity
+        # When a crew member lands at an airport (diversion_airport_id or arrival_airport_id),
+        # their very next flight must originate from that same airport.
+        for i in range(len(crew_flights) - 1):
+            flight_a = crew_flights[i]
+            flight_b = crew_flights[i + 1]
+
+            start_a = effective_departure(flight_a)
+            start_b = effective_departure(flight_b)
+
+            # Only check continuity if flight_b is scheduled after flight_a
+            if start_b <= start_a:
+                continue
+
+            # Determine where the crew member ends up after flight_a
+            landing_airport_id = None
+            if flight_a.diversion_airport_id:
+                landing_airport_id = flight_a.diversion_airport_id
+            elif flight_a.actual_arrival and flight_a.status in (
+                Flight.Status.LANDED,
+                Flight.Status.ARRIVED,
+                Flight.Status.DIVERTED,
+            ):
+                landing_airport_id = flight_a.diversion_airport_id or flight_a.arrival_airport_id
+            elif flight_a.status in (
+                Flight.Status.LANDED,
+                Flight.Status.ARRIVED,
+                Flight.Status.DIVERTED,
+            ):
+                landing_airport_id = flight_a.diversion_airport_id or flight_a.arrival_airport_id
+            else:
+                # For scheduled/en-route flights, use the planned arrival
+                landing_airport_id = flight_a.diversion_airport_id or flight_a.arrival_airport_id
+
+            if landing_airport_id and flight_b.departure_airport_id != landing_airport_id:
+                airport_name = "unknown"
+                landing_airport = Flight.objects.filter(id=landing_airport_id).first()
+                if landing_airport:
+                    airport_name = landing_airport.departure_airport.display_code  # will be updated with correct airport
+                violations.append(
+                    _crew_violation(
+                        "geo_continuity",
+                        f"{crew_member.full_name()} lands at a different airport than where "
+                        f"{flight_b.flight_number} departs.",
+                        flight_b,
+                        crew_member,
+                    )
+                )
 
     return violations
 

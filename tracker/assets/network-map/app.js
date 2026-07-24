@@ -8,10 +8,12 @@ import {
     fitNetworkBounds,
     installOperationalLayers,
     LAYER_IDS,
+    loadAndCacheCrewIcon,
     prepareAirportLabels,
     reloadBasemap,
     setBasemapVisible,
     setLayerVisibility,
+    SOURCE_IDS,
     updateMapSources,
     waitForMapLoad,
 } from "./map.js";
@@ -165,6 +167,39 @@ if (root) {
         root.classList.toggle("is-stale", state.stale);
     }
 
+    async function loadCrewIcons() {
+        if (!map || !latestPayload) return;
+        const flightMap = flightState.flights;
+        const promises = [];
+        for (const flight of flightMap.values()) {
+            if (flight.crew) {
+                for (const member of flight.crew) {
+                    if (member.picture) {
+                        const iconId = `crew-icon-${member.name.replace(/\s+/g, "-").toLowerCase()}`;
+                        if (!map.hasImage(iconId)) {
+                            promises.push(loadAndCacheCrewIcon(map, member.picture, iconId));
+                        }
+                    }
+                }
+            }
+        }
+        if (promises.length > 0) {
+            await Promise.allSettled(promises);
+            // Refresh crew source data after icons are loaded
+            if (mapReady) {
+                const now = performance.now();
+                const collections = buildMapCollections(
+                    flightMap,
+                    currentSimulationMilliseconds(now),
+                    routeCache,
+                    progressState,
+                    { authoritativeOnly: false, includeStatic: false },
+                );
+                map.getSource(SOURCE_IDS.crew)?.setData(collections.crew);
+            }
+        }
+    }
+
     function updateSummary(summary) {
         for (const [key, value] of Object.entries(summary ?? {})) {
             const target = root.querySelector(`[data-map-summary="${key}"]`);
@@ -290,7 +325,17 @@ if (root) {
         dom.selected.aircraftUrl.href = flight.aircraft_url;
     }
 
-    function renderMapFrame(now = performance.now(), authoritativeOnly = false) {
+    async function loadCrewIconsFromCollections(collections) {
+        const loadedIcons = [];
+        for (const feature of collections.crew?.features ?? []) {
+            const iconId = feature.properties?.crew_icon;
+            if (!iconId || map?.hasImage?.(iconId)) continue;
+            // We'll load from the crew data in applyPayload instead
+        }
+        return loadedIcons;
+    }
+
+    async function renderMapFrame(now = performance.now(), authoritativeOnly = false) {
         if (!latestPayload) return;
         const simulationMilliseconds = currentSimulationMilliseconds(now);
         if (!Number.isFinite(simulationMilliseconds)) return;
@@ -312,6 +357,8 @@ if (root) {
                 selectedRouteCollection(selectedFlight, routeCache),
                 { staticSources: authoritativeOnly },
             );
+            // Load crew icons asynchronously
+            loadCrewIconsFromCollections(collections).catch(() => {});
         }
         renderSelectedFlight();
         renderClock(now);
@@ -366,6 +413,8 @@ if (root) {
                 error: true,
             });
         }
+        // Load crew profile pictures asynchronously
+        loadCrewIcons().catch(() => {});
         startAnimation();
         return true;
     }

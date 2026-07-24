@@ -6,6 +6,7 @@ export const SOURCE_IDS = {
     completedRoutes: "completed-routes",
     aircraft: "active-aircraft",
     selected: "selected-flight",
+    crew: "active-crew",
 };
 
 export const LAYER_IDS = {
@@ -16,6 +17,7 @@ export const LAYER_IDS = {
     labels: "airport-labels",
     aircraftHalo: "aircraft-halo",
     aircraftIcon: "aircraft-icons",
+    crewMarkers: "crew-markers",
 };
 
 export const BASEMAP_SOURCE_ID = "basemap";
@@ -215,12 +217,127 @@ function loadImage(url) {
     });
 }
 
+/**
+ * Create a map pin-shaped icon with a profile picture inside.
+ * Returns an ImageData object for map.addImage().
+ */
+function createCrewPinImage(image, size = 64) {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+
+    // Draw map pin shape
+    const cx = size / 2;
+    const cy = size / 2;
+    const radius = size * 0.42;
+    const tipY = size * 0.82;
+
+    // Pin body (dark background with sky border)
+    ctx.beginPath();
+    ctx.arc(cx, cy - radius * 0.15, radius, 0, Math.PI * 2);
+    ctx.lineTo(cx, tipY);
+    ctx.closePath();
+
+    // Fill with dark color
+    ctx.fillStyle = "#071019";
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = "#53c7ed";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw profile picture inside circle
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy - radius * 0.15, radius * 0.72, 0, Math.PI * 2);
+    ctx.clip();
+
+    // Draw image centered and scaled
+    const imgSize = radius * 1.5;
+    const imgX = cx - imgSize / 2;
+    const imgY = cy - radius * 0.15 - imgSize / 2;
+    ctx.drawImage(image, imgX, imgY, imgSize, imgSize);
+    ctx.restore();
+
+    // Add a subtle inner glow
+    ctx.beginPath();
+    ctx.arc(cx, cy - radius * 0.15, radius * 0.72, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(83, 199, 237, 0.4)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    return canvas.getContext("2d").getImageData(0, 0, size, size);
+}
+
+/**
+ * Create a default silhouette icon for crew without profile pictures.
+ */
+function createDefaultCrewIcon(role, size = 64) {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+
+    const cx = size / 2;
+    const cy = size / 2;
+    const radius = size * 0.42;
+
+    // Pin body
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.fillStyle = "#071019";
+    ctx.fill();
+    ctx.strokeStyle = "#53c7ed";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Silhouette (pilot/flight attendant)
+    ctx.fillStyle = "#53c7ed";
+    // Head
+    ctx.beginPath();
+    ctx.arc(cx, cy - radius * 0.2, radius * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    // Body
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + radius * 0.5, radius * 0.45, radius * 0.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    return ctx.getImageData(0, 0, size, size);
+}
+
+/**
+ * Load a profile image and cache the crew marker icon.
+ */
+export async function loadAndCacheCrewIcon(map, url, iconId) {    if (map.hasImage(iconId)) return;
+    try {
+        const img = await loadImage(url);
+        const imageData = createCrewPinImage(img);
+        map.addImage(iconId, imageData, { pixelRatio: 2 });
+    } catch {
+        // Fall back to default icon
+        const defaultImage = createDefaultCrewIcon(null);
+        map.addImage(iconId, defaultImage, { pixelRatio: 2 });
+    }
+}
+
+/** Cached crew image Promises to avoid redundant fetches. */
+const crewImageCache = new Map();
+
 export async function installOperationalLayers(map, aircraftIconUrl) {
     for (const sourceId of Object.values(SOURCE_IDS)) {
         map.addSource(sourceId, {
             type: "geojson",
             data: emptyFeatureCollection(),
         });
+    }
+
+    // Pre-load crew icons for any initial data
+    const cachedCrewLoads = [];
+    for (const [key, promise] of crewImageCache.entries()) {
+        cachedCrewLoads.push(promise.catch(() => {}));
     }
 
     map.addLayer({
@@ -329,6 +446,23 @@ export async function installOperationalLayers(map, aircraftIconUrl) {
     } catch {
         // The colored halo remains a useful, clickable aircraft fallback.
     }
+
+    // Crew markers layer - shows crew profile icons as markers on flights
+    map.addLayer({
+        id: LAYER_IDS.crewMarkers,
+        type: "symbol",
+        source: SOURCE_IDS.crew,
+        layout: {
+            "icon-image": ["get", "crew_icon"],
+            "icon-size": ["interpolate", ["linear"], ["zoom"], 1, 0.35, 6, 0.55, 10, 0.7],
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+            "icon-offset": [0, -8],
+        },
+        paint: {
+            "icon-opacity": 0.88,
+        },
+    });
 }
 
 export function prepareAirportLabels(map, featureCollection) {
