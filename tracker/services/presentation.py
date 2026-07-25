@@ -6,10 +6,11 @@ from datetime import datetime
 from datetime import timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
-from django.urls import reverse
+from django.db.models import Prefetch
 from django.templatetags.static import static
+from django.urls import reverse
 
-from tracker.models import Flight
+from tracker.models import Flight, FlightCrew
 
 from .status import effective_arrival, effective_departure, estimated_progress, get_flight_status
 
@@ -35,6 +36,23 @@ def duration_label(minutes: int) -> str:
     return f"{remainder}m"
 
 
+def flight_crew_prefetch() -> Prefetch:
+    """Return the shared prefetch used by every flight serializer."""
+    return Prefetch(
+        "flight_crew",
+        queryset=FlightCrew.objects.select_related("crew_member"),
+    )
+
+
+def flight_crew_records(flight: Flight):
+    """Use prefetched crew when available and stay efficient for standalone calls."""
+    if flight.pk is None:
+        return ()
+    if "flight_crew" in getattr(flight, "_prefetched_objects_cache", {}):
+        return flight.flight_crew.all()
+    return flight.flight_crew.select_related("crew_member").all()
+
+
 def serialize_flight(flight: Flight, at_time: datetime) -> dict[str, object]:
     """Build one canonical row used by initial HTML and live JSON refreshes."""
     status = get_flight_status(flight, at_time)
@@ -48,21 +66,18 @@ def serialize_flight(flight: Flight, at_time: datetime) -> dict[str, object]:
     result_airport = flight.diversion_airport or flight.arrival_airport
 
     crew_list = []
-    for fc in flight.flight_crew.select_related("crew_member").all():
+    for fc in flight_crew_records(flight):
         crew_member = fc.crew_member
-        picture_url = None
-        if crew_member.profile_picture:
-            from django.templatetags.static import static
-            # CHANGED: Passed the string directly
-        picture_url = static(crew_member.profile_picture)        
-        crew_list.append({
-            "full_name": crew_member.full_name(),
-            "role": crew_member.get_role_display(),
-            "role_code": crew_member.role,
-            "profile_picture": picture_url,
-        })
+        picture_url = static(crew_member.profile_picture) if crew_member.profile_picture else None
+        crew_list.append(
+            {
+                "full_name": crew_member.full_name(),
+                "role": crew_member.get_role_display(),
+                "role_code": crew_member.role,
+                "profile_picture": picture_url,
+            }
+        )
     crew_list.sort(key=lambda c: (c["role"], c["full_name"]))
-
 
     return {
         "flight_number": flight.flight_number,

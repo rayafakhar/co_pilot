@@ -191,7 +191,7 @@ class NetworkMapDataTests(TestCase):
         self.assertEqual(payload["flights"], [])
         self.assertEqual(payload["summary"]["omitted_flights"], 1)
 
-    def test_endpoint_uses_one_clock_and_one_bounded_flight_query(self):
+    def test_endpoint_uses_bounded_clock_flight_and_crew_queries(self):
         for index in range(4):
             self.create_flight(f"QUERY{index}")
 
@@ -199,7 +199,7 @@ class NetworkMapDataTests(TestCase):
             with CaptureQueriesContext(connection) as queries:
                 response = self.client.get(reverse("tracker:network_map_data"))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(queries), 2)
+        self.assertEqual(len(queries), 3)
         flight_query = next(query["sql"] for query in queries if "tracker_flight" in query["sql"])
         self.assertIn("LIMIT 500", flight_query)
 

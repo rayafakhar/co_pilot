@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from django.templatetags.static import static
 from django.urls import reverse
 
 from tracker.models import Flight, SimulationClock
 
-from .presentation import utc_iso
+from .presentation import flight_crew_prefetch, flight_crew_records, utc_iso
 from .status import effective_arrival, effective_departure, estimated_progress, get_flight_status
 
 MAP_CANDIDATE_LIMIT = 500
@@ -67,18 +68,19 @@ def serialize_map_flight(
 
     aircraft_type = flight.aircraft.aircraft_type
 
-    # Minimal crew picture URLs for map marker icons
+    # Minimal crew picture URLs for map marker icons.
     crew_pictures = []
-    for fc in flight.flight_crew.select_related("crew_member")[:3]:  # Limit to 3 for map display
+    for fc in list(flight_crew_records(flight))[:3]:
         crew_member = fc.crew_member
         if crew_member.profile_picture:
-            from django.templatetags.static import static
             picture_url = static(crew_member.profile_picture)
-            crew_pictures.append({
-                "name": crew_member.full_name(),
-                "picture": picture_url,
-                "role": crew_member.role,
-            })
+            crew_pictures.append(
+                {
+                    "name": crew_member.full_name(),
+                    "picture": picture_url,
+                    "role": crew_member.role,
+                }
+            )
 
     return {
         "flight_number": flight.flight_number,
@@ -182,6 +184,7 @@ def build_network_map_payload(
             "arrival_airport",
             "diversion_airport",
         )
+        .prefetch_related(flight_crew_prefetch())
         .order_by("scheduled_departure", "flight_number")[:MAP_CANDIDATE_LIMIT]
     )
 

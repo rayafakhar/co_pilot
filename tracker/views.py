@@ -23,7 +23,7 @@ from .services.clock import (
 )
 from .services.distance import practical_range_km
 from .services.map_data import build_network_map_payload
-from .services.presentation import serialize_flight, utc_iso, utc_label
+from .services.presentation import flight_crew_prefetch, serialize_flight, utc_iso, utc_label
 
 BOARD_CANDIDATE_LIMIT = 1000
 BOARD_LIMIT = 250
@@ -40,7 +40,7 @@ def _board_rows(request, at_time):
         "departure_airport",
         "arrival_airport",
         "diversion_airport",
-    )
+    ).prefetch_related(flight_crew_prefetch())
     search = request.GET.get("q", "").strip()
     aircraft = request.GET.get("aircraft", "").strip()
     airport = request.GET.get("airport", "").strip()
@@ -201,7 +201,9 @@ def aircraft_detail(request, registration):
             "departure_airport",
             "arrival_airport",
             "diversion_airport",
-        ).order_by("scheduled_departure")
+        )
+        .prefetch_related(flight_crew_prefetch())
+        .order_by("scheduled_departure")
     )
     blocks = list(MaintenanceBlock.objects.filter(aircraft=aircraft).order_by("starts_at"))
     at_time, generated_at = _request_times()
@@ -225,7 +227,7 @@ def flight_detail(request, flight_number):
             "departure_airport",
             "arrival_airport",
             "diversion_airport",
-        ),
+        ).prefetch_related(flight_crew_prefetch()),
         flight_number__iexact=flight_number,
     )
     at_time, generated_at = _request_times()

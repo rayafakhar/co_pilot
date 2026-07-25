@@ -61,13 +61,13 @@ class OperationsViewTests(TestCase):
             [row["flight_number"] for row in response.context["rows"]], [item.flight_number]
         )
 
-    def test_json_endpoint_uses_server_status_and_one_flight_query(self):
+    def test_json_endpoint_uses_server_status_and_bounded_flight_queries(self):
         url = reverse("tracker:flight_board_data")
         with (
             patch("tracker.views.timezone.now", return_value=ANCHOR),
             patch("tracker.views.get_simulation_time", return_value=ANCHOR),
         ):
-            with self.assertNumQueries(1):
+            with self.assertNumQueries(2):
                 response = self.client.get(url)
         payload = response.json()
         self.assertEqual(response.status_code, 200)
@@ -184,7 +184,8 @@ class OperationsViewTests(TestCase):
             with CaptureQueriesContext(connection) as queries:
                 response = self.client.get(reverse("tracker:flight_board"))
                 self.assertEqual(response.status_code, 200)
-        self.assertLessEqual(len(queries), 3)
+        # Flights and their crew are fetched in two bounded queries; filter options use two more.
+        self.assertLessEqual(len(queries), 4)
 
     def test_aircraft_detail_and_missing_registration(self):
         item = Aircraft.objects.first()
@@ -200,7 +201,8 @@ class OperationsViewTests(TestCase):
         self.assertContains(response, item.aircraft_type.image_author)
         self.assertContains(response, item.aircraft_type.image_license)
         self.assertContains(response, item.aircraft_type.image_source_url)
-        self.assertLessEqual(len(queries), 4)
+        # Aircraft, flights, crew, maintenance, and the simulation clock stay constant-size.
+        self.assertLessEqual(len(queries), 5)
         missing = self.client.get(reverse("tracker:aircraft_detail", args=["MISSING"]))
         self.assertEqual(missing.status_code, 404)
 
