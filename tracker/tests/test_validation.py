@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from django.test import TestCase
 
-from tracker.models import Flight, MaintenanceBlock
+from tracker.models import CrewMember, Flight, FlightCrew, MaintenanceBlock
 from tracker.services.distance import calculate_duration, haversine_distance_km
 from tracker.services.validation import validate_schedule, violation_counts
 
@@ -74,3 +74,33 @@ class ScheduleValidationTests(TestCase):
         self.assertEqual(counts["cancelled_movement"], 1)
         self.assertEqual(counts["actual_time"], 1)
         self.assertEqual(counts["invalid_diversion"], 1)
+
+    def test_crew_continuity_reports_people_and_airports_for_iterables(self):
+        first = self.plausible_flight("TS401", self.origin, self.middle, self.start)
+        second = self.plausible_flight(
+            "TS402",
+            self.other,
+            self.origin,
+            self.start + timedelta(hours=10),
+        )
+        first.save()
+        second.save()
+        crew_member = CrewMember.objects.create(
+            first_name="Avery",
+            last_name="Stone",
+            role=CrewMember.Role.PILOT,
+        )
+        FlightCrew.objects.bulk_create(
+            [
+                FlightCrew(flight=first, crew_member=crew_member),
+                FlightCrew(flight=second, crew_member=crew_member),
+            ]
+        )
+
+        with self.assertNumQueries(2):
+            violations = validate_schedule(iter([first, second]))
+        continuity = next(item for item in violations if item.code == "geo_continuity")
+
+        self.assertEqual(continuity.crew_member_name, "Avery Stone")
+        self.assertIn(self.middle.display_code, continuity.message)
+        self.assertIn(self.other.display_code, continuity.message)
