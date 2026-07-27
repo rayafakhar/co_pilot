@@ -175,6 +175,7 @@ describe("MapLibre source updates", () => {
             routes: emptyFeatureCollection(),
             completedRoutes: emptyFeatureCollection(),
             aircraft: emptyFeatureCollection(),
+            crew: emptyFeatureCollection(),
         };
         updateMapSources(
             map,
@@ -185,17 +186,23 @@ describe("MapLibre source updates", () => {
         );
         expect(map.sources.get(SOURCE_IDS.completedRoutes).setData).toHaveBeenCalledOnce();
         expect(map.sources.get(SOURCE_IDS.aircraft).setData).toHaveBeenCalledOnce();
+        expect(map.sources.get(SOURCE_IDS.crew).setData).toHaveBeenCalledOnce();
         expect(map.sources.get(SOURCE_IDS.airports).setData).not.toHaveBeenCalled();
         expect(map.sources.get(SOURCE_IDS.routes).setData).not.toHaveBeenCalled();
         expect(map.sources.get(SOURCE_IDS.selected).setData).not.toHaveBeenCalled();
     });
 
-    it("updates all five persistent sources after authoritative reconciliation", () => {
+    it("updates all six persistent sources after authoritative reconciliation", () => {
         const map = mapDouble();
         const empty = emptyFeatureCollection();
         updateMapSources(
             map,
-            { routes: empty, completedRoutes: empty, aircraft: empty },
+            {
+                routes: empty,
+                completedRoutes: empty,
+                aircraft: empty,
+                crew: empty,
+            },
             empty,
             empty,
         );

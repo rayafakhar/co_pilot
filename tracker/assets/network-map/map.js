@@ -514,6 +514,9 @@ export function updateMapSources(
     }
     map.getSource(SOURCE_IDS.completedRoutes)?.setData(data.completedRoutes);
     map.getSource(SOURCE_IDS.aircraft)?.setData(data.aircraft);
+    map.getSource(SOURCE_IDS.crew)?.setData(
+        data.crew ?? emptyFeatureCollection(),
+    );
 }
 
 export function setLayerVisibility(map, layerIds, visible) {
