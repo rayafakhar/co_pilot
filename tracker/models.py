@@ -9,9 +9,6 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import F, Q
 
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-
 from .validators import validate_iana_timezone, validate_iata_code, validate_icao_code
 
 
@@ -398,8 +395,7 @@ class CrewMember(models.Model):
     first_name = models.CharField(max_length=120)
     last_name = models.CharField(max_length=120)
     role = models.CharField(max_length=20, choices=Role.choices)
-    
-    # CHANGED: Now a CharField pointing to our static SVGs
+
     profile_picture = models.CharField(
         max_length=255,
         blank=True,
@@ -425,7 +421,9 @@ class FlightCrew(models.Model):
     """Through table linking crew members to flights with uniqueness enforcement."""
 
     flight = models.ForeignKey(Flight, on_delete=models.CASCADE, related_name="flight_crew")
-    crew_member = models.ForeignKey(CrewMember, on_delete=models.CASCADE, related_name="assigned_flights")
+    crew_member = models.ForeignKey(
+        CrewMember, on_delete=models.CASCADE, related_name="assigned_flights"
+    )
     added_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
