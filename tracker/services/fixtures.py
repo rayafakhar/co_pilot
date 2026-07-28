@@ -281,6 +281,47 @@ AIRCRAFT_TYPES = (
         image_author="Acroterion",
         image_license="CC BY-SA 4.0",
     ),
+    dict(
+        manufacturer="Embraer",
+        model="E195-E2",
+        icao_type_code="E295",
+        category="regional",
+        typical_cruise_speed_kmh=850,
+        maximum_range_km=4900,
+        minimum_turnaround_minutes=40,
+        passenger_capacity=132,
+        crew_count=6,
+        wingspan_m=35.12,
+        length_m=41.60,
+        image="tracker/images/aircraft/embraer-e195-e2.jpg",
+        image_alt_text="Embraer E195-E2 taxiing after landing",
+        image_source_url=(
+            "https://commons.wikimedia.org/wiki/File:Embraer_E195-E2_(ERJ_190-400_STD)_PS-AEF.jpg"
+        ),
+        image_author="Alexandro Dias",
+        image_license="CC BY-SA 4.0",
+    ),
+    dict(
+        manufacturer="ATR",
+        model="72-600",
+        icao_type_code="AT76",
+        category="turboprop",
+        typical_cruise_speed_kmh=500,
+        maximum_range_km=1370,
+        minimum_turnaround_minutes=30,
+        passenger_capacity=72,
+        crew_count=4,
+        wingspan_m=27.05,
+        length_m=27.17,
+        image="tracker/images/aircraft/atr-72-600.jpg",
+        image_alt_text="ATR 72-600 on the apron at Dhaka",
+        image_source_url=(
+            "https://commons.wikimedia.org/wiki/"
+            "File:US-Bangla_Airlines_ATR_72-600_(S2-AKG)_@_DAC,_June_2019.jpg"
+        ),
+        image_author="Md Shaifuzzaman Ayon",
+        image_license="CC BY-SA 4.0",
+    ),
 )
 
 

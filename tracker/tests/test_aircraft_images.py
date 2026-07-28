@@ -34,5 +34,9 @@ class AircraftImageFixtureTests(SimpleTestCase):
                 images.add(image)
                 sources.add(source)
 
-        self.assertEqual(len(images), 7)
-        self.assertEqual(len(sources), 7)
+        self.assertEqual(len(images), 9)
+        self.assertEqual(len(sources), 9)
+        self.assertEqual(
+            {aircraft_type["category"] for aircraft_type in AIRCRAFT_TYPES},
+            {"narrow_body", "wide_body", "regional", "turboprop"},
+        )
