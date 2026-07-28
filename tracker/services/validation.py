@@ -26,7 +26,9 @@ def _violation(code: str, message: str, flight: Flight) -> ScheduleViolation:
     return ScheduleViolation(code, message, flight.aircraft.registration, flight.flight_number)
 
 
-def _crew_violation(code: str, message: str, flight: Flight, crew_member: CrewMember) -> ScheduleViolation:
+def _crew_violation(
+    code: str, message: str, flight: Flight, crew_member: CrewMember
+) -> ScheduleViolation:
     return ScheduleViolation(
         code,
         message,
@@ -36,35 +38,14 @@ def _crew_violation(code: str, message: str, flight: Flight, crew_member: CrewMe
     )
 
 
-def _get_crew_for_flight(flight: Flight) -> list[CrewMember]:
-    """Return the list of CrewMember instances assigned to a flight."""
-    return list(
-        CrewMember.objects.filter(
-            id__in=FlightCrew.objects.filter(flight=flight).values_list("crew_member_id", flat=True)
-        )
-    )
-
-
-def _get_crew_schedule(
-    crew_member: CrewMember,
-    flights: Iterable[Flight],
-) -> list[Flight]:
-    """Return sorted flights for a specific crew member."""
-    flight_ids = set(
-        FlightCrew.objects.filter(crew_member=crew_member).values_list("flight_id", flat=True)
-    )
-    crew_flights = [f for f in flights if f.id in flight_ids]
-    crew_flights.sort(key=lambda f: (f.scheduled_departure, f.flight_number))
-    return crew_flights
-
-
 def validate_schedule(
     flights: Iterable[Flight],
     maintenance_blocks: Iterable[MaintenanceBlock] = (),
 ) -> list[ScheduleViolation]:
     """Validate timing, range, continuity, movement, maintenance, and crew invariants."""
+    flight_list = list(flights)
     grouped: dict[int | None, list[Flight]] = defaultdict(list)
-    for flight in flights:
+    for flight in flight_list:
         grouped[flight.aircraft_id].append(flight)
     blocks_by_aircraft: dict[int | None, list[MaintenanceBlock]] = defaultdict(list)
     for block in maintenance_blocks:
@@ -148,24 +129,24 @@ def validate_schedule(
                 current_airport_id = flight.diversion_airport_id or flight.arrival_airport_id
 
     # ── Crew-specific validations ──────────────────────────────────────────
-    all_flights_list = list(flights)
-    flight_ids = [f.id for f in all_flights_list]
-    
-    # Get crew member IDs directly from the values_list query
-    crew_member_ids = set(
-        FlightCrew.objects.filter(
-            flight_id__in=flight_ids
-        ).values_list("crew_member_id", flat=True)
+    flights_by_id = {flight.pk: flight for flight in flight_list if flight.pk is not None}
+    crew_schedules: dict[int, list[Flight]] = defaultdict(list)
+    assignments = FlightCrew.objects.filter(flight_id__in=flights_by_id).values_list(
+        "crew_member_id",
+        "flight_id",
     )
-    
-    crew_member_set = set(
-        CrewMember.objects.filter(
-            id__in=crew_member_ids
-        ).values_list("id", flat=True)
-    )
+    for crew_member_id, flight_id in assignments:
+        crew_schedules[crew_member_id].append(flights_by_id[flight_id])
+    crew_members = CrewMember.objects.in_bulk(crew_schedules)
 
-    for crew_member in crew_member_set:
-        crew_flights = _get_crew_schedule(crew_member, all_flights_list)
+    for crew_member_id in sorted(crew_schedules):
+        crew_member = crew_members.get(crew_member_id)
+        if crew_member is None:
+            continue
+        crew_flights = sorted(
+            crew_schedules[crew_member_id],
+            key=lambda item: (effective_departure(item), item.flight_number),
+        )
 
         # Rule 1: No Double-Booking
         # Rule 2: 8-Hour Rest Rule
@@ -225,36 +206,15 @@ def validate_schedule(
             if start_b <= start_a:
                 continue
 
-            # Determine where the crew member ends up after flight_a
-            landing_airport_id = None
-            if flight_a.diversion_airport_id:
-                landing_airport_id = flight_a.diversion_airport_id
-            elif flight_a.actual_arrival and flight_a.status in (
-                Flight.Status.LANDED,
-                Flight.Status.ARRIVED,
-                Flight.Status.DIVERTED,
-            ):
-                landing_airport_id = flight_a.diversion_airport_id or flight_a.arrival_airport_id
-            elif flight_a.status in (
-                Flight.Status.LANDED,
-                Flight.Status.ARRIVED,
-                Flight.Status.DIVERTED,
-            ):
-                landing_airport_id = flight_a.diversion_airport_id or flight_a.arrival_airport_id
-            else:
-                # For scheduled/en-route flights, use the planned arrival
-                landing_airport_id = flight_a.diversion_airport_id or flight_a.arrival_airport_id
+            landing_airport = flight_a.diversion_airport or flight_a.arrival_airport
 
-            if landing_airport_id and flight_b.departure_airport_id != landing_airport_id:
-                airport_name = "unknown"
-                landing_airport = Flight.objects.filter(id=landing_airport_id).first()
-                if landing_airport:
-                    airport_name = landing_airport.departure_airport.display_code  # will be updated with correct airport
+            if flight_b.departure_airport_id != landing_airport.pk:
                 violations.append(
                     _crew_violation(
                         "geo_continuity",
-                        f"{crew_member.full_name()} lands at a different airport than where "
-                        f"{flight_b.flight_number} departs.",
+                        f"{crew_member.full_name()} lands at {landing_airport.display_code}, but "
+                        f"{flight_b.flight_number} departs from "
+                        f"{flight_b.departure_airport.display_code}.",
                         flight_b,
                         crew_member,
                     )

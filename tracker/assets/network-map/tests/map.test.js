@@ -5,6 +5,7 @@ import {
     BASEMAP_SOURCE_ID,
     createNetworkMap,
     LAYER_IDS,
+    loadAndCacheCrewIcon,
     reloadBasemap,
     setBasemapVisible,
     SOURCE_IDS,
@@ -175,6 +176,7 @@ describe("MapLibre source updates", () => {
             routes: emptyFeatureCollection(),
             completedRoutes: emptyFeatureCollection(),
             aircraft: emptyFeatureCollection(),
+            crew: emptyFeatureCollection(),
         };
         updateMapSources(
             map,
@@ -185,22 +187,85 @@ describe("MapLibre source updates", () => {
         );
         expect(map.sources.get(SOURCE_IDS.completedRoutes).setData).toHaveBeenCalledOnce();
         expect(map.sources.get(SOURCE_IDS.aircraft).setData).toHaveBeenCalledOnce();
+        expect(map.sources.get(SOURCE_IDS.crew).setData).toHaveBeenCalledOnce();
         expect(map.sources.get(SOURCE_IDS.airports).setData).not.toHaveBeenCalled();
         expect(map.sources.get(SOURCE_IDS.routes).setData).not.toHaveBeenCalled();
         expect(map.sources.get(SOURCE_IDS.selected).setData).not.toHaveBeenCalled();
     });
 
-    it("updates all five persistent sources after authoritative reconciliation", () => {
+    it("updates all six persistent sources after authoritative reconciliation", () => {
         const map = mapDouble();
         const empty = emptyFeatureCollection();
         updateMapSources(
             map,
-            { routes: empty, completedRoutes: empty, aircraft: empty },
+            {
+                routes: empty,
+                completedRoutes: empty,
+                aircraft: empty,
+                crew: empty,
+            },
             empty,
             empty,
         );
         for (const source of map.sources.values()) {
             expect(source.setData).toHaveBeenCalledOnce();
+        }
+    });
+
+    it("caches shared crew portraits and installs a fallback icon", async () => {
+        const context = {
+            arc: vi.fn(),
+            beginPath: vi.fn(),
+            clip: vi.fn(),
+            closePath: vi.fn(),
+            drawImage: vi.fn(),
+            ellipse: vi.fn(),
+            fill: vi.fn(),
+            getImageData: vi.fn(() => ({ data: "crew-marker" })),
+            lineTo: vi.fn(),
+            restore: vi.fn(),
+            save: vi.fn(),
+            stroke: vi.fn(),
+        };
+        vi.stubGlobal("document", {
+            createElement: vi.fn(() => ({
+                getContext: vi.fn(() => context),
+                height: 0,
+                width: 0,
+            })),
+        });
+        let imageLoads = 0;
+        vi.stubGlobal(
+            "Image",
+            class ImageDouble {
+                set src(_url) {
+                    imageLoads += 1;
+                    queueMicrotask(() => this.onload?.());
+                }
+            },
+        );
+
+        const images = new Set();
+        const addImage = vi.fn((iconId) => images.add(iconId));
+        const map = {
+            addImage,
+            hasImage: (iconId) => images.has(iconId),
+        };
+        const sharedPortrait = "https://crew.test/shared.png";
+
+        try {
+            await Promise.all([
+                loadAndCacheCrewIcon(map, sharedPortrait, "crew-one", "captain"),
+                loadAndCacheCrewIcon(map, sharedPortrait, "crew-one", "captain"),
+                loadAndCacheCrewIcon(map, sharedPortrait, "crew-two", "captain"),
+            ]);
+            await loadAndCacheCrewIcon(map, "", "crew-fallback", "first-officer");
+
+            expect(imageLoads).toBe(1);
+            expect(addImage).toHaveBeenCalledTimes(3);
+            expect(images).toEqual(new Set(["crew-one", "crew-two", "crew-fallback"]));
+        } finally {
+            vi.unstubAllGlobals();
         }
     });
 });

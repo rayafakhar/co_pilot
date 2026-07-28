@@ -3,7 +3,15 @@
 from django import forms
 from django.contrib import admin
 
-from .models import Aircraft, AircraftType, Airport, CrewMember, Flight, FlightCrew, MaintenanceBlock
+from .models import (
+    Aircraft,
+    AircraftType,
+    Airport,
+    CrewMember,
+    Flight,
+    FlightCrew,
+    MaintenanceBlock,
+)
 from .services.validation import validate_schedule
 
 
@@ -166,10 +174,9 @@ class CrewMemberAdmin(admin.ModelAdmin):
     list_filter = ("role",)
     search_fields = ("first_name", "last_name", "role")
 
-    @admin.display(description="Has Profile Picture")
+    @admin.display(boolean=True, description="Has Profile Picture")
     def has_profile_picture(self, obj):
         return bool(obj.profile_picture)
-    has_profile_picture.boolean = True
 
 
 @admin.register(FlightCrew)
