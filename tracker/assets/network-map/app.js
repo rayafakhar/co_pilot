@@ -174,11 +174,11 @@ if (root) {
         for (const flight of flightMap.values()) {
             if (flight.crew) {
                 for (const member of flight.crew) {
-                    if (member.picture) {
-                        const iconId = `crew-icon-${member.name.replace(/\s+/g, "-").toLowerCase()}`;
-                        if (!map.hasImage(iconId)) {
-                            promises.push(loadAndCacheCrewIcon(map, member.picture, iconId));
-                        }
+                    const iconId = `crew-icon-${member.name.replace(/\s+/g, "-").toLowerCase()}`;
+                    if (!map.hasImage(iconId)) {
+                        promises.push(
+                            loadAndCacheCrewIcon(map, member.picture, iconId, member.role),
+                        );
                     }
                 }
             }
@@ -325,16 +325,6 @@ if (root) {
         dom.selected.aircraftUrl.href = flight.aircraft_url;
     }
 
-    async function loadCrewIconsFromCollections(collections) {
-        const loadedIcons = [];
-        for (const feature of collections.crew?.features ?? []) {
-            const iconId = feature.properties?.crew_icon;
-            if (!iconId || map?.hasImage?.(iconId)) continue;
-            // We'll load from the crew data in applyPayload instead
-        }
-        return loadedIcons;
-    }
-
     async function renderMapFrame(now = performance.now(), authoritativeOnly = false) {
         if (!latestPayload) return;
         const simulationMilliseconds = currentSimulationMilliseconds(now);
@@ -357,8 +347,6 @@ if (root) {
                 selectedRouteCollection(selectedFlight, routeCache),
                 { staticSources: authoritativeOnly },
             );
-            // Load crew icons asynchronously
-            loadCrewIconsFromCollections(collections).catch(() => {});
         }
         renderSelectedFlight();
         renderClock(now);

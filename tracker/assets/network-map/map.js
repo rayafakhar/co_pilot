@@ -311,20 +311,32 @@ function createDefaultCrewIcon(role, size = 64) {
 /**
  * Load a profile image and cache the crew marker icon.
  */
-export async function loadAndCacheCrewIcon(map, url, iconId) {    if (map.hasImage(iconId)) return;
+const crewImageCache = new Map();
+
+async function buildCrewMarkerImage(url, role) {
+    if (!url) return createDefaultCrewIcon(role);
+
     try {
         const img = await loadImage(url);
-        const imageData = createCrewPinImage(img);
-        map.addImage(iconId, imageData, { pixelRatio: 2 });
+        return createCrewPinImage(img);
     } catch {
-        // Fall back to default icon
-        const defaultImage = createDefaultCrewIcon(null);
-        map.addImage(iconId, defaultImage, { pixelRatio: 2 });
+        return createDefaultCrewIcon(role);
     }
 }
 
-/** Cached crew image Promises to avoid redundant fetches. */
-const crewImageCache = new Map();
+export async function loadAndCacheCrewIcon(map, url, iconId, role = null) {
+    if (map.hasImage(iconId)) return;
+
+    const cacheKey = url || `default:${role ?? "crew"}`;
+    if (!crewImageCache.has(cacheKey)) {
+        crewImageCache.set(cacheKey, buildCrewMarkerImage(url, role));
+    }
+
+    const imageData = await crewImageCache.get(cacheKey);
+    if (!map.hasImage(iconId)) {
+        map.addImage(iconId, imageData, { pixelRatio: 2 });
+    }
+}
 
 export async function installOperationalLayers(map, aircraftIconUrl) {
     for (const sourceId of Object.values(SOURCE_IDS)) {
@@ -332,12 +344,6 @@ export async function installOperationalLayers(map, aircraftIconUrl) {
             type: "geojson",
             data: emptyFeatureCollection(),
         });
-    }
-
-    // Pre-load crew icons for any initial data
-    const cachedCrewLoads = [];
-    for (const [key, promise] of crewImageCache.entries()) {
-        cachedCrewLoads.push(promise.catch(() => {}));
     }
 
     map.addLayer({
