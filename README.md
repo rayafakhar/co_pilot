@@ -15,12 +15,15 @@ validated before data is committed.
 - Haversine route distance and transparent distance-based block-time estimates
 - Practical aircraft range and minimum-turnaround enforcement
 - Delay propagation, cancellations, diversions, ferry legs, and maintenance blocks
+- Seeded crew assignments with overlap, eight-hour rest, and location checks
+- Distinct, faceless crew portraits generated as local SVGs at simulation time
 - One authoritative server-side flight lifecycle with exact boundary tests
 - UTC storage plus explicitly labelled UTC and airport-local display times
 - A filterable, responsive flight board refreshed from JSON every 20 seconds
 - A persistent, controllable simulation clock shared by every operational view
 - A responsive live network map rendered with MapLibre from a bounded Django feed
 - Great-circle routes, bearings, and schedule-derived interpolation powered by Turf
+- Nine aircraft types across narrow-body, wide-body, regional, and turboprop operations
 - Aircraft pages with licensed model-specific photography, current state, technical data, and timelines
 - Flight detail pages comparing scheduled, estimated, and actual timing
 - Structured validation errors, atomic generation, and rollback on violations
@@ -41,6 +44,11 @@ diversion airport. A cancelled leg does not move it. The next effective departur
 pushed beyond the previous effective arrival plus type-specific turnaround. Generated
 maintenance windows push readiness farther forward. The entire stored plus proposed
 schedule is validated inside one transaction before batched flight insertion.
+
+The same seed creates a stable roster of 20 crew members and generates their distinct,
+faceless SVG portraits locally. Eligible pilots and flight attendants are assigned
+without double-booking, with at least eight hours between duties and continuous airport
+positioning between consecutive assignments.
 
 ~~~mermaid
 flowchart LR
@@ -76,9 +84,12 @@ The database, model layer, and cross-flight validator collectively enforce:
 13. No operation overlapping a maintenance block
 14. Coherent actual departure and arrival timestamps
 15. Full-schedule validation before transaction commit
+16. No overlapping flight assignments for one crew member
+17. At least eight hours of rest between consecutive crew assignments
+18. Crew departure from the airport where their previous assignment ended
 
 The validator returns structured ScheduleViolation records with a code, message,
-aircraft registration, and flight number.
+aircraft registration, flight number, and crew member name when applicable.
 
 ## Status lifecycle
 
@@ -124,7 +135,7 @@ Activate the environment:
 source .venv/bin/activate
 
 # Windows PowerShell
-..venvScriptsActivate.ps1
+.\.venv\Scripts\Activate.ps1
 ~~~
 
 Then install and run:
@@ -182,6 +193,19 @@ chosen random seed while placing the schedule on a specific date.
 Data is never deleted unless --clear is supplied. Generation and validation share
 one atomic transaction.
 
+### Reference fleet
+
+| Category | Types |
+| --- | --- |
+| Narrow-body | Airbus A320neo, Airbus A321neo, Boeing 737 MAX 8 |
+| Wide-body | Airbus A330-300, Airbus A350-900, Boeing 777-300ER, Boeing 787-9 |
+| Regional jet | Embraer E195-E2 |
+| Turboprop | ATR 72-600 |
+
+Each type has distinct performance and turnaround inputs plus a repository-local,
+licensed photograph. Source, author, licence, and retrieval details are recorded in
+[image attribution](docs/IMAGE_ATTRIBUTIONS.md).
+
 ## Simulation clock
 
 The singleton `SimulationClock` stores a deterministic schedule anchor, its matching
@@ -201,8 +225,9 @@ python manage.py simulation_clock --reset
 The map polls authoritative state every 15 seconds. Between responses, Turf
 interpolates a visual position along a great-circle route from effective departure,
 arrival, and simulation timestamps. MapLibre keeps persistent GeoJSON sources and
-layers rather than recreating the map. Pausing visual motion in the browser does not
-pause the server clock.
+layers rather than recreating the map. Crew portraits are decoded once and shared
+across their markers; a local silhouette keeps a crew marker visible if its portrait
+is unavailable. Pausing visual motion in the browser does not pause the server clock.
 
 Aircraft positions are interpolated from the deterministic schedule and authoritative
 simulation clock. They are not GPS, ADS-B, radar, or airline operational positions.
@@ -240,7 +265,8 @@ Coverage includes models, lifecycle boundaries, timezone equivalence, distance a
 duration, unsafe-schedule detection, deterministic generation across multiple seeds,
 command rollback, simulation-clock transitions, filters, JSON polling, bounded map
 queries, detail pages, great-circle geometry, client reconciliation, reduced-motion
-behavior, and persistent MapLibre source updates.
+behavior, persistent MapLibre source updates, crew portrait generation, crew legality,
+fleet photo integrity, category coverage, and crew-marker image fallbacks.
 
 Node.js is needed only when maintaining or verifying map assets. `npm run build`
 bundles the pinned MapLibre and modular Turf dependencies with esbuild; the generated
@@ -255,30 +281,32 @@ tracker/
 ├── migrations/                  Data-preserving aviation-domain migration
 ├── services/
 │   ├── analytics.py             Aircraft statistics and merged timeline
+│   ├── clock.py                 Persistent simulation-time authority
 │   ├── distance.py              Haversine and block-time assumptions
-│   ├── fixtures.py              Small transparent reference dataset
+│   ├── fixtures.py              Airports and nine-type reference fleet
 │   ├── generator.py             Deterministic itinerary construction
+│   ├── map_data.py              Bounded live-map snapshot builder
 │   ├── presentation.py          Shared HTML/JSON row representation
 │   ├── status.py                Single lifecycle authority
 │   └── validation.py            Structured cross-flight invariants
-├── static/tracker/              Local CSS, JavaScript, aircraft photos, and fallback SVG
+├── assets/network-map/          Modular map source and Vitest suite
+├── static/tracker/              Bundles, aircraft photos, crew art, and fallback SVG
 ├── templates/tracker/           Board and detail pages
 └── tests/                       Domain, engine, command, and view coverage
 docs/                            Baseline, assumptions, attribution, screenshots
 ~~~
 
-Map-specific additions include `tracker/services/clock.py`,
-`tracker/services/map_data.py`, the `tracker/assets/network-map/` source and Vitest
-suite, committed output in `tracker/static/tracker/dist/`, and
-`docs/LIVE_MAP_ARCHITECTURE.md`.
+The generated map output is committed in `tracker/static/tracker/dist/`; its design
+and data flow are described in `docs/LIVE_MAP_ARCHITECTURE.md`.
 
 ## Simulation assumptions and limitations
 
 This is an understandable operations simulation, not certified dispatch software.
 Cruise speeds, ranges, capacities, dimensions, and turnaround values are rounded
 illustrative inputs. Great-circle distance omits airway routing, winds, weather,
-airspace restrictions, payload-range trade-offs, slot controls, and crew legality.
-Progress is time interpolation, not ADS-B.
+airspace restrictions, payload-range trade-offs, slot controls, and full regulatory
+crew-duty modelling beyond the enforced overlap, rest, and location rules. Progress
+is time interpolation, not ADS-B.
 
 See [simulation assumptions](docs/SIMULATION_ASSUMPTIONS.md) and
 [live map architecture](docs/LIVE_MAP_ARCHITECTURE.md) for technical detail, and
