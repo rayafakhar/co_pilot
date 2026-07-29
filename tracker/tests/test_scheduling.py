@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from django.test import TestCase
 
-from tracker.models import Aircraft, Flight, MaintenanceBlock
+from tracker.models import Aircraft, CrewMember, Flight, MaintenanceBlock
 from tracker.services.distance import practical_range_km
 from tracker.services.generator import GenerationConfig, generate_schedule, generation_anchor
 from tracker.services.status import effective_arrival, effective_departure, get_flight_status
@@ -136,6 +136,14 @@ class GeneratedScheduleInvariantTests(TestCase):
             config(707, aircraft_count=3, min_flights_per_aircraft=4, max_flights_per_aircraft=4)
         )
         original_numbers = set(Flight.objects.values_list("flight_number", flat=True))
+        original_crew = set(
+            CrewMember.objects.values_list(
+                "first_name",
+                "last_name",
+                "role",
+                "profile_picture",
+            )
+        )
         append_config = config(
             808,
             clear=False,
@@ -148,6 +156,18 @@ class GeneratedScheduleInvariantTests(TestCase):
             original_numbers.issubset(set(Flight.objects.values_list("flight_number", flat=True)))
         )
         self.assertEqual(Aircraft.objects.count(), 5)
+        self.assertEqual(CrewMember.objects.count(), 20)
+        self.assertEqual(
+            set(
+                CrewMember.objects.values_list(
+                    "first_name",
+                    "last_name",
+                    "role",
+                    "profile_picture",
+                )
+            ),
+            original_crew,
+        )
 
     def test_append_mode_fills_registration_gap_without_collision(self):
         generate_schedule(

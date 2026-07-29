@@ -25,7 +25,7 @@ from tracker.models import (
 from .clock import initialize_simulation_clock, reset_simulation_clock
 from .distance import calculate_duration, haversine_distance_km, practical_range_km
 from .fixtures import load_reference_data
-from .status import get_flight_status
+from .status import effective_arrival, effective_departure, get_flight_status
 from .validation import ScheduleViolation, validate_schedule, violation_counts
 
 
@@ -484,78 +484,54 @@ def _create_crew(
     return crew_members
 
 
-class CrewAssignmentError(RuntimeError):
-    """Raised when crew cannot be assigned without violating rules."""
-
-    def __init__(self, message: str):
-        super().__init__(message)
-
-
-@dataclass
-class _CrewMemberState:
-    """Tracks the scheduling state of a crew member for validation."""
-
-    last_flight_effective_arrival: datetime | None = None
-    last_flight_arrival_airport: Airport | None = None
+def _load_or_create_crew(seed: int) -> list[CrewMember]:
+    """Keep one stable roster when generation appends another schedule batch."""
+    existing = list(CrewMember.objects.order_by("pk"))
+    return existing or _create_crew(count=20, seed=seed)
 
 
 def _can_assign_crew_to_flight(
-    crew_member: CrewMember,
     flight: Flight,
-    crew_states: dict[int, _CrewMemberState],
-    _all_flights_for_validation: list[Flight],
+    assigned_flights: list[Flight],
 ) -> tuple[bool, str]:
-    """Check if a crew member can be assigned to a flight without violating rules.
+    """Check overlap, rest, and location against assignments on both sides."""
+    departure = effective_departure(flight)
+    arrival = effective_arrival(flight)
+    previous = None
+    following = None
 
-    Returns:
-        (can_assign, reason_if_not)
-    """
-    effective_departure = flight.estimated_departure or flight.scheduled_departure
-    effective_arrival = flight.estimated_arrival or flight.scheduled_arrival
-
-    # Get existing FlightCrew records for this crew member (excluding current flight if updating)
-    existing_assignments = FlightCrew.objects.filter(crew_member=crew_member).select_related(
-        "flight"
-    )
-
-    test_state = _CrewMemberState(
-        last_flight_effective_arrival=crew_states.get(
-            crew_member.pk, _CrewMemberState()
-        ).last_flight_effective_arrival,
-        last_flight_arrival_airport=crew_states.get(
-            crew_member.pk, _CrewMemberState()
-        ).last_flight_arrival_airport,
-    )
-
-    # Check against existing FlightCrew assignments
-    for fc in existing_assignments:
-        other_flight = fc.flight
+    for other_flight in assigned_flights:
         if other_flight.pk == flight.pk:
             continue
-
-        other_eff_dep = other_flight.estimated_departure or other_flight.scheduled_departure
-        other_eff_arr = other_flight.estimated_arrival or other_flight.scheduled_arrival
-
-        # Rule 1: No double-booking (overlap check)
-        if not (effective_departure >= other_eff_arr or other_eff_dep >= effective_arrival):
+        other_departure = effective_departure(other_flight)
+        other_arrival = effective_arrival(other_flight)
+        if departure < other_arrival and other_departure < arrival:
             return False, "Double-booking: schedule overlap with another flight"
+        if other_departure < departure and (
+            previous is None or other_departure > effective_departure(previous)
+        ):
+            previous = other_flight
+        elif other_departure > departure and (
+            following is None or other_departure < effective_departure(following)
+        ):
+            following = other_flight
 
-    # Rule 2: 8-hour rest rule
-    if test_state.last_flight_effective_arrival:
-        rest_period = effective_departure - test_state.last_flight_effective_arrival
-        if rest_period < timedelta(hours=8):
-            return (
-                False,
-                f"Insufficient rest: only {rest_period.total_seconds() / 3600:.1f} hours since last arrival",
-            )
+    minimum_rest = timedelta(hours=8)
+    if previous is not None:
+        rest_period = departure - effective_arrival(previous)
+        if rest_period < minimum_rest:
+            return False, "Insufficient rest after the previous assignment"
+        previous_result_id = previous.diversion_airport_id or previous.arrival_airport_id
+        if flight.departure_airport_id != previous_result_id:
+            return False, "Departure does not match the previous assignment location"
 
-    # Rule 3: Geographic continuity
-    if test_state.last_flight_arrival_airport:
-        if flight.departure_airport.pk != test_state.last_flight_arrival_airport.pk:
-            return (
-                False,
-                f"Geographic violation: last landed at {test_state.last_flight_arrival_airport}, but next departs from {flight.departure_airport}",
-            )
+    if following is not None:
+        rest_period = effective_departure(following) - arrival
+        if rest_period < minimum_rest:
+            return False, "Insufficient rest before the following assignment"
+        result_id = flight.diversion_airport_id or flight.arrival_airport_id
+        if following.departure_airport_id != result_id:
+            return False, "Arrival does not match the following assignment location"
 
     return True, ""
 
@@ -755,7 +731,6 @@ def _assign_crew_to_flights(
     flights: list[Flight],
     crew: list[CrewMember],
     rng: random.Random,
-    config: GenerationConfig,
 ) -> None:
     """Assign crew members to flights respecting validation rules.
 
@@ -765,7 +740,7 @@ def _assign_crew_to_flights(
     - 8-hour minimum rest between flights
     - Geographic continuity (crew must depart from where they arrived)
 
-    Each flight gets at least 2 pilots and 2 flight attendants (based on flight type).
+    The allocator targets two pilots and one or two flight attendants per movement.
     """
     if not crew:
         return
@@ -777,79 +752,41 @@ def _assign_crew_to_flights(
     operable_flights = [f for f in flights if f.status != Flight.Status.CANCELLED]
     operable_flights.sort(key=lambda f: (f.scheduled_departure, f.departure_airport.pk))
 
-    # Track state for each crew member
-    crew_states: dict[int, _CrewMemberState] = {}
+    crew_schedules = {member.pk: [] for member in crew}
+    existing_assignments = FlightCrew.objects.filter(
+        crew_member_id__in=crew_schedules
+    ).select_related("flight")
+    for assignment in existing_assignments:
+        crew_schedules[assignment.crew_member_id].append(assignment.flight)
 
     for flight in operable_flights:
-        eff_departure = flight.estimated_departure or flight.scheduled_departure
-        eff_arrival = flight.estimated_arrival or flight.scheduled_arrival
-
         # Determine crew needs based on flight type
         needs_pilots = 2
         needs_fas = 2 if flight.flight_type == Flight.FlightType.PASSENGER else 1
 
-        # Track which crew are assigned to this flight for state updates
-        assigned_this_flight: list[int] = []
-
         def can_use_crew(
             crew_member: CrewMember,
             current_flight: Flight = flight,
-            current_departure: datetime = eff_departure,
-            current_arrival: datetime = eff_arrival,
         ) -> bool:
             """Check if crew member can fly this flight."""
-            state = crew_states.get(crew_member.pk)
-            if not state:
-                state = _CrewMemberState()
-
-            # Check 8-hour rest rule
-            if state.last_flight_effective_arrival:
-                rest_needed = current_departure - state.last_flight_effective_arrival
-                if rest_needed < timedelta(hours=8):
-                    return False
-
-            # Check geographic continuity
-            if state.last_flight_arrival_airport:
-                if current_flight.departure_airport.pk != state.last_flight_arrival_airport.pk:
-                    # Allow if this is one of the first few flights for the crew member
-                    # (they might be starting their schedule)
-                    if state.last_flight_effective_arrival:
-                        return False
-
-            # Check no overlapping assignments
-            for fc in FlightCrew.objects.filter(crew_member=crew_member).select_related("flight"):
-                other = fc.flight
-                if other.pk == current_flight.pk:
-                    continue
-                other_eff_dep = other.estimated_departure or other.scheduled_departure
-                other_eff_arr = other.estimated_arrival or other.scheduled_arrival
-                # Check overlap
-                if not (current_departure >= other_eff_arr or other_eff_dep >= current_arrival):
-                    return False
-
-            return True
+            eligible, _reason = _can_assign_crew_to_flight(
+                current_flight,
+                crew_schedules[crew_member.pk],
+            )
+            return eligible
 
         def assign_crew_member(
             crew_member: CrewMember,
             current_flight: Flight = flight,
-            current_arrival: datetime = eff_arrival,
-            assigned_ids: list[int] = assigned_this_flight,
         ) -> None:
-            """Assign crew member to flight and update state."""
+            """Assign a crew member and update the in-memory schedule."""
             fc = FlightCrew(
                 crew_member=crew_member,
                 flight=current_flight,
             )
             fc.full_clean()
             fc.save()
-
-            if crew_member.pk not in crew_states:
-                crew_states[crew_member.pk] = _CrewMemberState()
-            crew_states[crew_member.pk].last_flight_effective_arrival = current_arrival
-            crew_states[crew_member.pk].last_flight_arrival_airport = (
-                current_flight.diversion_airport or current_flight.arrival_airport
-            )
-            assigned_ids.append(crew_member.pk)
+            crew_schedules[crew_member.pk].append(current_flight)
 
         # Assign pilots
         pilots_assigned = 0
@@ -875,17 +812,16 @@ def _assign_crew_to_flights(
                 assign_crew_member(fa)
                 fass_assigned += 1
     for crew_member in crew:
-        assigned = list(
-            FlightCrew.objects.filter(crew_member=crew_member)
-            .select_related("flight")
-            .order_by("flight__scheduled_departure")
+        assigned = sorted(
+            crew_schedules[crew_member.pk],
+            key=lambda item: (effective_departure(item), item.flight_number),
         )
         for i in range(len(assigned) - 1):
-            f1 = assigned[i].flight
-            f2 = assigned[i + 1].flight
+            f1 = assigned[i]
+            f2 = assigned[i + 1]
 
-            arr1 = f1.actual_arrival or f1.estimated_arrival or f1.scheduled_arrival
-            dep2 = f2.estimated_departure or f2.scheduled_departure
+            arr1 = effective_arrival(f1)
+            dep2 = effective_departure(f2)
 
             land_ap1 = f1.diversion_airport_id or f1.arrival_airport_id
             dep_ap2 = f2.departure_airport_id
@@ -945,8 +881,8 @@ def generate_schedule(config: GenerationConfig) -> GenerationReport:
             aircraft.maintenance_status = Aircraft.MaintenanceStatus.SCHEDULED
         aircraft.save(update_fields=["last_known_airport", "maintenance_status"])
 
-    # Create crew members
-    crew = _create_crew(count=20, seed=config.seed + 1000)
+    # Append mode keeps the established roster and its generated portrait files stable.
+    crew = _load_or_create_crew(seed=config.seed + 1000)
 
     # Load existing database records
     stored_flights = list(
@@ -975,7 +911,7 @@ def generate_schedule(config: GenerationConfig) -> GenerationReport:
     )
 
     # Assign crew to flights after they have PKs
-    _assign_crew_to_flights(all_flights, crew, rng, config)
+    _assign_crew_to_flights(all_flights, crew, rng)
 
     # Validate entire schedule
     violations = validate_schedule(
