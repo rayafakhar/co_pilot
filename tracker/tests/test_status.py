@@ -86,6 +86,23 @@ class FlightStatusTests(TestCase):
         )
         self.assertEqual(self.status_at(self.departure), Flight.Status.DIVERTED)
 
+    def test_diversion_transitions_to_arrived_at_its_effective_arrival(self):
+        self.item.status = Flight.Status.DIVERTED
+        self.item.diversion_airport = airport("CDG", latitude=49, longitude=2)
+        self.assertEqual(
+            self.status_at(self.item.scheduled_arrival - timedelta(seconds=1)),
+            Flight.Status.DIVERTED,
+        )
+        self.assertEqual(self.status_at(self.item.scheduled_arrival), Flight.Status.ARRIVED)
+
+        self.item.actual_departure = self.departure
+        self.item.actual_arrival = self.departure + timedelta(hours=1, minutes=40)
+        self.assertEqual(
+            self.status_at(self.item.actual_arrival - timedelta(seconds=1)),
+            Flight.Status.DIVERTED,
+        )
+        self.assertEqual(self.status_at(self.item.actual_arrival), Flight.Status.ARRIVED)
+
     def test_same_instant_in_multiple_timezones_has_same_status(self):
         utc_instant = self.departure - timedelta(minutes=30)
         new_york = utc_instant.astimezone(ZoneInfo("America/New_York"))
