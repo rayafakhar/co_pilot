@@ -72,15 +72,14 @@ def serialize_map_flight(
     crew_pictures = []
     for fc in list(flight_crew_records(flight))[:3]:
         crew_member = fc.crew_member
-        if crew_member.profile_picture:
-            picture_url = static(crew_member.profile_picture)
-            crew_pictures.append(
-                {
-                    "name": crew_member.full_name(),
-                    "picture": picture_url,
-                    "role": crew_member.role,
-                }
-            )
+        picture_url = static(crew_member.profile_picture) if crew_member.profile_picture else None
+        crew_pictures.append(
+            {
+                "name": crew_member.full_name(),
+                "picture": picture_url,
+                "role": crew_member.role,
+            }
+        )
 
     return {
         "flight_number": flight.flight_number,

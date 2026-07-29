@@ -8,7 +8,7 @@ from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
-from tracker.models import Flight, SimulationClock
+from tracker.models import CrewMember, Flight, FlightCrew, SimulationClock
 from tracker.services.clock import ClockConfigurationError, reset_simulation_clock
 from tracker.services.map_data import network_bounds
 
@@ -125,6 +125,29 @@ class NetworkMapDataTests(TestCase):
         self.assertEqual(serialized["result_destination"]["coordinates"], [-0.4543, 51.47])
         self.assertEqual(serialized["progress"], 50)
         self.assert_no_database_ids(payload)
+
+    def test_portraitless_crew_reach_the_map_fallback_marker(self):
+        item = self.create_flight()
+        crew_member = CrewMember.objects.create(
+            first_name="Jordan",
+            last_name="Lee",
+            role=CrewMember.Role.PILOT,
+            profile_picture="",
+        )
+        FlightCrew.objects.create(flight=item, crew_member=crew_member)
+
+        _, payload = self.get_payload()
+
+        self.assertEqual(
+            payload["flights"][0]["crew"],
+            [
+                {
+                    "name": "Jordan Lee",
+                    "picture": None,
+                    "role": CrewMember.Role.PILOT,
+                }
+            ],
+        )
 
     def test_progress_is_clamped_at_departure_midpoint_and_near_arrival(self):
         self.create_flight(
