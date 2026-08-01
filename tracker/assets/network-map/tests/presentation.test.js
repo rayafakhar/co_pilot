@@ -65,6 +65,39 @@ describe("map presentation state", () => {
         });
     });
 
+    it("keeps crew markers anchored to the aircraft with screen-space positions", () => {
+        const crewFlight = {
+            ...flight,
+            crew: [
+                { name: "Avery Stone" },
+                { name: "Jordan Lee" },
+                { name: "Morgan Chen" },
+            ],
+        };
+        const collections = buildMapCollections(
+            new Map([[crewFlight.flight_number, crewFlight]]),
+            Date.parse("2026-07-19T11:00:00Z"),
+            new Map(),
+            new Map(),
+            { authoritativeOnly: true },
+        );
+        const aircraftCoordinates = collections.aircraft.features[0].geometry.coordinates;
+
+        expect(collections.crew.features).toHaveLength(3);
+        expect(
+            collections.crew.features.map((feature) => feature.geometry.coordinates),
+        ).toEqual([
+            aircraftCoordinates,
+            aircraftCoordinates,
+            aircraftCoordinates,
+        ]);
+        expect(
+            collections.crew.features.map(
+                (feature) => feature.properties.crew_position,
+            ),
+        ).toEqual(["left", "center", "right"]);
+    });
+
     it("skips static route features during animation-only source updates", () => {
         const collections = buildMapCollections(
             new Map([[flight.flight_number, flight]]),
