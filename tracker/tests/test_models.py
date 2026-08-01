@@ -56,6 +56,34 @@ class AirportModelTests(TestCase):
         with self.assertRaises(ValidationError):
             item.full_clean()
 
+    def test_blank_optional_codes_are_normalized_to_null(self):
+        first = Airport(
+            name="First local field",
+            city="Example",
+            country="Testland",
+            iata_code="",
+            icao_code="",
+            timezone="UTC",
+        )
+        first.full_clean()
+        first.save()
+
+        second = Airport(
+            name="Second local field",
+            city="Example",
+            country="Testland",
+            iata_code="",
+            icao_code="",
+            timezone="UTC",
+        )
+        second.full_clean()
+        second.save()
+
+        self.assertIsNone(first.iata_code)
+        self.assertIsNone(first.icao_code)
+        self.assertIsNone(second.iata_code)
+        self.assertIsNone(second.icao_code)
+
 
 class AircraftModelTests(TestCase):
     def setUp(self):
