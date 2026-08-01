@@ -61,6 +61,30 @@ class OperationsViewTests(TestCase):
             [row["flight_number"] for row in response.context["rows"]], [item.flight_number]
         )
 
+    def test_board_search_finds_a_diversion_airport_and_city(self):
+        item = Flight.objects.select_related("departure_airport", "arrival_airport").first()
+        Flight.objects.exclude(pk=item.pk).delete()
+        diversion = (
+            item.departure_airport.__class__.objects.exclude(
+                pk__in=[item.departure_airport_id, item.arrival_airport_id]
+            )
+            .exclude(iata_code=None)
+            .first()
+        )
+        self.assertIsNotNone(diversion)
+        item.status = Flight.Status.DIVERTED
+        item.diversion_airport = diversion
+        item.save(update_fields=["status", "diversion_airport"])
+
+        board_url = reverse("tracker:flight_board")
+        for query in (diversion.iata_code.lower(), diversion.city.lower()):
+            with self.subTest(query=query):
+                response = self.request_at_anchor(f"{board_url}?q={query}")
+                self.assertEqual(
+                    [row["flight_number"] for row in response.context["rows"]],
+                    [item.flight_number],
+                )
+
     def test_json_endpoint_uses_server_status_and_bounded_flight_queries(self):
         url = reverse("tracker:flight_board_data")
         with (

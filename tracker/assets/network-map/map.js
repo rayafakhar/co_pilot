@@ -463,7 +463,15 @@ export async function installOperationalLayers(map, aircraftIconUrl) {
             "icon-size": ["interpolate", ["linear"], ["zoom"], 1, 0.35, 6, 0.55, 10, 0.7],
             "icon-allow-overlap": true,
             "icon-ignore-placement": true,
-            "icon-offset": [0, -8],
+            "icon-offset": [
+                "match",
+                ["get", "crew_position"],
+                "left",
+                ["literal", [-20, -10]],
+                "right",
+                ["literal", [20, -10]],
+                ["literal", [0, -12]],
+            ],
         },
         paint: {
             "icon-opacity": 0.88,

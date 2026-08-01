@@ -91,10 +91,8 @@ class Airport(models.Model):
 
     def clean(self) -> None:
         super().clean()
-        if self.iata_code:
-            self.iata_code = self.iata_code.upper()
-        if self.icao_code:
-            self.icao_code = self.icao_code.upper()
+        self.iata_code = self.iata_code.upper() if self.iata_code else None
+        self.icao_code = self.icao_code.upper() if self.icao_code else None
         if (self.latitude is None) != (self.longitude is None):
             raise ValidationError("Latitude and longitude must be provided together.")
 

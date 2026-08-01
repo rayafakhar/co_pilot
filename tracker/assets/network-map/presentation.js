@@ -110,20 +110,25 @@ export function buildMapCollections(
 
         // Add crew marker features at the aircraft position
         if (flight.crew && flight.crew.length > 0) {
-            const crewLngLat = position.geometry.coordinates;
             for (let i = 0; i < flight.crew.length; i++) {
                 const member = flight.crew[i];
+                const crewPosition =
+                    flight.crew.length === 1
+                        ? "center"
+                        : i === 0
+                          ? "left"
+                          : i === flight.crew.length - 1
+                            ? "right"
+                            : "center";
                 crew.features.push({
                     type: "Feature",
                     geometry: {
                         type: "Point",
-                        coordinates: [
-                            crewLngLat[0] + (i - (flight.crew.length - 1) / 2) * 0.15,
-                            crewLngLat[1] + 0.12,
-                        ],
+                        coordinates: position.geometry.coordinates,
                     },
                     properties: {
                         crew_icon: `crew-icon-${member.name.replace(/\s+/g, "-").toLowerCase()}`,
+                        crew_position: crewPosition,
                         flight_number: flight.flight_number,
                     },
                 });
