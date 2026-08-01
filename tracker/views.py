@@ -55,6 +55,8 @@ def _board_rows(request, at_time):
             | Q(arrival_airport__iata_code__icontains=search)
             | Q(departure_airport__city__icontains=search)
             | Q(arrival_airport__city__icontains=search)
+            | Q(diversion_airport__iata_code__icontains=search)
+            | Q(diversion_airport__city__icontains=search)
         )
     if aircraft:
         queryset = queryset.filter(aircraft__registration__iexact=aircraft)
