@@ -1,0 +1,36 @@
+/* theme.css – colour tokens */
+:root {
+    /* Light theme (default) */
+    --bg-primary: hsl(210, 15%, 97%);
+    /* very light gray */
+    --bg-surface: hsl(0, 0%, 100%);
+    --text-primary: hsl(210, 10%, 10%);
+    --accent: hsl(210, 70%, 55%);
+    /* nice blue‑ish accent */
+    --border: hsl(210, 15%, 85%);
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] {
+    --bg-primary: hsl(210, 15%, 12%);
+    --bg-surface: hsl(210, 15%, 18%);
+    --text-primary: hsl(210, 10%, 90%);
+    --accent: hsl(210, 70%, 65%);
+    --border: hsl(210, 15%, 30%);
+}
+
+/* Apply the tokens */
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+a {
+    color: var(--accent);
+}
+
+hr,
+.card,
+.navbar {
+    border-color: var(--border);
+}

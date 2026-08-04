@@ -1,6 +1,6 @@
 {% load static %}
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +9,10 @@
     <title>{% block title %}Northstar Operations{% endblock %}</title>
     <link rel="icon" href="{% static 'tracker/images/aircraft-silhouette.svg' %}" type="image/svg+xml">
     <link rel="stylesheet" href="{% static 'tracker/css/operations.css' %}">
+    <link rel="stylesheet" href="{% static 'tracker/css/theme.css' %}">
     {% block extra_styles %}{% endblock %}
+    <!-- Apply saved theme before first paint to avoid flash -->
+    <script src="{% static 'tracker/js/theme-toggle.js' %}"></script>
     <script src="{% static 'tracker/js/operations.js' %}" defer></script>
     {% block extra_scripts %}{% endblock %}
 </head>
@@ -30,6 +33,11 @@
                 <a href="{% url 'tracker:flight_board' %}">Flight board</a>
                 <a href="{% url 'tracker:network_map' %}">Live network map</a>
                 <a href="{% url 'admin:index' %}">Admin</a>
+                <button id="theme-toggle" aria-label="Toggle dark / light mode">
+                    <svg id="theme-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M12 4.5V2m0 20v-2.5M5.64 5.64l-1.77-1.77M20.13 20.13l-1.77-1.77M4.5 12H2m20 0h-2.5M5.64 18.36l-1.77 1.77M20.13 3.87l-1.77 1.77M12 7a5 5 0 100 10 5 5 0 000-10z"/>
+                    </svg>
+                </button>
             </nav>
             <div class="clock-cluster">
                 <div>
