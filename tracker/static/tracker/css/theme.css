@@ -34,3 +34,18 @@ hr,
 .navbar {
     border-color: var(--border);
 }
+
+/* Simple visible theme‑toggle button */
+#theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+#theme-toggle:hover { background: var(--bg-surface); }
