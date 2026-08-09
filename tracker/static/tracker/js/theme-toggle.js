@@ -49,6 +49,10 @@
     var btn = document.getElementById('theme-toggle');
     if (!btn) return;
 
+    // Synchronize the icon and meta tag once DOM is fully parsed
+    var current = document.documentElement.getAttribute('data-theme');
+    setTheme(current);
+
     btn.addEventListener('click', function () {
       var current = document.documentElement.getAttribute('data-theme');
       setTheme(current === 'dark' ? 'light' : 'dark');

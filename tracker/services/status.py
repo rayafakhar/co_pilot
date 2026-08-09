@@ -76,6 +76,8 @@ def get_flight_status(flight: Flight, at_time: datetime | None = None) -> Flight
 
 def estimated_progress(flight: Flight, at_time: datetime | None = None) -> int:
     """Return clamped journey-time progress; this is not a live aircraft position."""
+    if flight.status == Flight.Status.CANCELLED:
+        return 0
     at_time = at_time or timezone.now()
     departure = effective_departure(flight)
     arrival = effective_arrival(flight)

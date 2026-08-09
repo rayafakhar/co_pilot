@@ -119,3 +119,7 @@ class FlightStatusTests(TestCase):
         self.assertEqual(estimated_progress(self.item, self.departure - timedelta(hours=1)), 0)
         self.assertEqual(estimated_progress(self.item, self.departure + timedelta(hours=1)), 50)
         self.assertEqual(estimated_progress(self.item, self.departure + timedelta(hours=3)), 100)
+
+    def test_cancelled_flight_progress_is_zero(self):
+        self.item.status = Flight.Status.CANCELLED
+        self.assertEqual(estimated_progress(self.item, self.departure + timedelta(hours=1)), 0)

@@ -144,7 +144,7 @@ def validate_schedule(
         if crew_member is None:
             continue
         crew_flights = sorted(
-            crew_schedules[crew_member_id],
+            [f for f in crew_schedules[crew_member_id] if f.status != Flight.Status.CANCELLED],
             key=lambda item: (effective_departure(item), item.flight_number),
         )
 

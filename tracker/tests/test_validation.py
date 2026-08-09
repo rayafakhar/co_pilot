@@ -104,3 +104,31 @@ class ScheduleValidationTests(TestCase):
         self.assertEqual(continuity.crew_member_name, "Avery Stone")
         self.assertIn(self.middle.display_code, continuity.message)
         self.assertIn(self.other.display_code, continuity.message)
+
+    def test_crew_validation_ignores_cancelled_flights(self):
+        first = self.plausible_flight("TS501", self.origin, self.middle, self.start)
+        second = self.plausible_flight(
+            "TS502",
+            self.other,
+            self.origin,
+            self.start + timedelta(hours=10),
+        )
+        first.status = Flight.Status.CANCELLED
+        first.save()
+        second.save()
+        crew_member = CrewMember.objects.create(
+            first_name="Avery",
+            last_name="Stone",
+            role=CrewMember.Role.PILOT,
+        )
+        FlightCrew.objects.bulk_create(
+            [
+                FlightCrew(flight=first, crew_member=crew_member),
+                FlightCrew(flight=second, crew_member=crew_member),
+            ]
+        )
+
+        violations = validate_schedule([first, second])
+        # Since the first flight is cancelled, the crew member is not flying it,
+        # so there should be no geo_continuity violations.
+        self.assertEqual(len([v for v in violations if v.code in ("geo_continuity", "insufficient_rest", "double_booking")]), 0)
