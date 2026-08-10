@@ -131,4 +131,14 @@ class ScheduleValidationTests(TestCase):
         violations = validate_schedule([first, second])
         # Since the first flight is cancelled, the crew member is not flying it,
         # so there should be no geo_continuity violations.
-        self.assertEqual(len([v for v in violations if v.code in ("geo_continuity", "insufficient_rest", "double_booking")]), 0)
+        self.assertEqual(
+            len(
+                [
+                    v
+                    for v in violations
+                    if v.code in ("geo_continuity", "insufficient_rest", "double_booking")
+                ]
+            ),
+            0,
+        )
+
