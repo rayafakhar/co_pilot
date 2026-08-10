@@ -141,4 +141,3 @@ class ScheduleValidationTests(TestCase):
             ),
             0,
         )
-
