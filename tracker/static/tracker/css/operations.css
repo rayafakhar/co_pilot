@@ -33,6 +33,24 @@ body[data-theme="dark"] {
     --photo-overlay: rgba(3, 10, 16, .9);
     --credit-bg: rgba(3, 10, 16, .72);
     --credit-text: #dce7ee;
+
+:root[data-theme="light"],
+html[data-theme="light"] {
+    --ink: #0f172a;
+    --muted: #475569;
+    --faint: #64748b;
+    --night: #f8fafc;
+    --panel: #ffffff;
+    --panel-2: #f1f5f9;
+    --line: #cbd5e1;
+    --sky: #0284c7;
+    --sky-soft: #e0f2fe;
+    --hero-bg: #e2e8f0;
+    --input-bg: #ffffff;
+    --input-border: #cbd5e1;
+    --runway-card-bg: rgba(255, 255, 255, .9);
+}
+
 }
 
 :root[data-theme="light"],
