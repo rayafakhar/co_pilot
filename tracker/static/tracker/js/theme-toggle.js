@@ -18,22 +18,35 @@
   /* ── Helpers ── */
   function setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('northstar-theme', theme);
 
-    // Swap the icon path
-    const icon = document.getElementById('theme-icon');
-    if (icon) {
-      icon.innerHTML =
-        '<path d="' + (theme === 'dark' ? MOON_PATH : SUN_PATH) + '"/>';
+    // Safely write to localStorage to prevent SecurityError in restricted environments
+    try {
+      localStorage.setItem('northstar-theme', theme);
+    } catch (e) {
+      // Ignored if cookies/storage are disabled
+    }
+
+    // Swap the SVG path element's d attribute safely
+    const pathElement = document.querySelector('#theme-icon path');
+    if (pathElement) {
+      pathElement.setAttribute('d', theme === 'dark' ? MOON_PATH : SUN_PATH);
     }
 
     // Keep the meta color-scheme in sync so the browser chrome matches
     const meta = document.querySelector('meta[name="color-scheme"]');
-    if (meta) meta.setAttribute('content', theme);
+    if (meta) {
+      meta.setAttribute('content', theme);
+    }
   }
 
   /* ── 1. Apply saved or OS preference immediately (before paint) ── */
-  var saved = localStorage.getItem('northstar-theme');
+  var saved = null;
+  try {
+    saved = localStorage.getItem('northstar-theme');
+  } catch (e) {
+    // Ignored if cookies/storage are disabled
+  }
+
   if (saved === 'dark' || saved === 'light') {
     setTheme(saved);
   } else {
@@ -45,17 +58,23 @@
   }
 
   /* ── 2. Wire the button once the DOM is ready ── */
-  document.addEventListener('DOMContentLoaded', function () {
+  function initToggle() {
     var btn = document.getElementById('theme-toggle');
     if (!btn) return;
 
     // Synchronize the icon and meta tag once DOM is fully parsed
-    var current = document.documentElement.getAttribute('data-theme');
+    var current = document.documentElement.getAttribute('data-theme') || 'light';
     setTheme(current);
 
     btn.addEventListener('click', function () {
       var current = document.documentElement.getAttribute('data-theme');
       setTheme(current === 'dark' ? 'light' : 'dark');
     });
-  });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initToggle);
+  } else {
+    initToggle();
+  }
 })();

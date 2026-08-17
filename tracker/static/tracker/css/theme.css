@@ -1,39 +1,5 @@
-/* theme.css – colour tokens */
-:root {
-    /* Light theme (default) */
-    --bg-primary: hsl(210, 15%, 97%);
-    /* very light gray */
-    --bg-surface: hsl(0, 0%, 100%);
-    --text-primary: hsl(210, 10%, 10%);
-    --accent: hsl(210, 70%, 55%);
-    /* nice blue‑ish accent */
-    --border: hsl(210, 15%, 85%);
-}
-
-/* Dark theme overrides */
-[data-theme="dark"] {
-    --bg-primary: hsl(210, 15%, 12%);
-    --bg-surface: hsl(210, 15%, 18%);
-    --text-primary: hsl(210, 10%, 90%);
-    --accent: hsl(210, 70%, 65%);
-    --border: hsl(210, 15%, 30%);
-}
-
-/* Apply the tokens */
-body {
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-}
-
-a {
-    color: var(--accent);
-}
-
-hr,
-.card,
-.navbar {
-    border-color: var(--border);
-}
+/* theme.css – theme‑toggle button styling only.
+   All colour tokens live in operations.css to avoid conflicts. */
 
 /* Simple visible theme‑toggle button */
 #theme-toggle {
@@ -42,10 +8,19 @@ hr,
   justify-content: center;
   width: 2rem;
   height: 2rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 4px;
   background: transparent;
+  color: var(--muted);
   cursor: pointer;
   margin-left: 0.5rem;
+  transition: background .18s ease, color .18s ease;
 }
-#theme-toggle:hover { background: var(--bg-surface); }
+#theme-toggle:hover {
+  background: var(--panel-2);
+  color: var(--ink);
+}
+#theme-toggle svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
